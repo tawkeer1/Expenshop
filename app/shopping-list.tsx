@@ -328,7 +328,6 @@ export default function ShoppingListScreen() {
                     <ThemedView style={styles.cardInfo}>
                       <ThemedView style={styles.listHeaderRow}>
                         <ThemedText style={styles.listName}>{item.name}</ThemedText>
-                        <Ionicons name="pencil" size={16} color="#94a3b8" />
                       </ThemedView>
 <ThemedText style={styles.listMeta}>{item.category}</ThemedText>
                       {/* <ThemedText style={styles.listMeta}>Price: ${item.price.toFixed(2)} each</ThemedText> */}

@@ -1,11 +1,11 @@
+import { Ionicons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { router } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 
 export default function AddPanel() {
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -26,7 +26,7 @@ export default function AddPanel() {
     setIsExpanded(index !== -1);
   }, []);
 
-  const handleNavigate = useCallback((screen: "shopping-list" | "expense") => {
+  const handleNavigate = useCallback((screen: "shopping-list" | "expense" | "contact") => {
     bottomSheetRef.current?.close();
     setIsExpanded(false);
     router.push(`/${screen}`);
@@ -68,6 +68,13 @@ export default function AddPanel() {
           >
             <ThemedText>💰 Expense</ThemedText>
           </Pressable>
+
+          <Pressable
+            style={styles.option}
+            onPress={() => handleNavigate("contact")}
+          >
+            <ThemedText>📞 Contact</ThemedText>
+          </Pressable>
         </BottomSheetView>
       </BottomSheet>
     </>
@@ -95,18 +102,19 @@ const styles = StyleSheet.create({
   },
 
   sheetBackground: {
-    backgroundColor: "#000000",
+    borderColor: "#1f2937",
+    backgroundColor: "#171717",
   },
 
   sheetContent: {
     paddingTop: 8,
     paddingBottom: 16,
-    backgroundColor: "#000000",
+    backgroundColor: "#171717",
   },
 
   option: {
     padding: 20,
     borderBottomWidth: 1,
-    borderColor: "#2a2a2a",
+    borderColor: "#1f2937",
   },
 });

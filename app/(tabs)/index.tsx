@@ -6,9 +6,9 @@ import AddPanel from "../addpanel";
 export default function HomeScreen() {
   return (
     <ThemedView style={styles.mainContainer}>
-      <ThemedText>Hello there,</ThemedText>
-      <ThemedText>Get started by adding your expenses</ThemedText>
-      <ThemedText style={styles.contactText}>Contact: towqeerahmad111@gmail.com</ThemedText>
+      <ThemedText style={styles.contactText}>
+        Hello there, Get started by adding your expenses
+      </ThemedText>
       <AddPanel />
     </ThemedView>
   );
