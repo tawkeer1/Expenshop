@@ -2,9 +2,7 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 ## Preview
-![App Screenshot](./assets/images/AppImage1.jpeg)
-![App Screenshot](./assets/images/AppImage2.jpeg)
-![App Screenshot](./assets/images/AppImage3.jpeg)
+<p align="center"> <img src="./assets/images/AppImage1.jpeg" width="220" alt="Expense screen"> <img src="./assets/images/AppImage2.jpeg" width="220" alt="Shop screen"> <img src="./assets/images/AppImage3.jpeg" width="220" alt="Shop screen"> </p>
 ## Get started
 
 1. Install dependencies
