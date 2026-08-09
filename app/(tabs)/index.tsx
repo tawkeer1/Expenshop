@@ -6,7 +6,9 @@ import AddPanel from "../addpanel";
 export default function HomeScreen() {
   return (
     <ThemedView style={styles.mainContainer}>
-      <ThemedText>Hello thee</ThemedText>
+      <ThemedText>Hello there,</ThemedText>
+      <ThemedText>Get started by adding your expenses</ThemedText>
+      <ThemedText style={styles.contactText}>Contact: towqeerahmad111@gmail.com</ThemedText>
       <AddPanel />
     </ThemedView>
   );
@@ -24,5 +26,11 @@ const styles = StyleSheet.create({
   stepContainer: {
     gap: 8,
     marginBottom: 8,
+  },
+  contactText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
