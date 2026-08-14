@@ -4,7 +4,9 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 ## Preview
 <p align="center"> <img src="./assets/images/AppImage1.jpeg" width="220" alt="Expense screen"> <img src="./assets/images/AppImage2.jpeg" width="220" alt="Shop screen"> <img src="./assets/images/AppImage3.jpeg" width="220" alt="Shop screen"> </p>
 
+## Incase you want to test the App
 [Download apk](https://drive.google.com/file/d/1j7tO1nCyHgtCn17HdcAG9WcWS6iFTouK/view?usp=drivesdk) 
+
 ## Get started
 
 1. Install dependencies
