@@ -59,6 +59,9 @@ export default function ContactScreen() {
           <ThemedText style={styles.buttonText}>Back</ThemedText>
         </Pressable>
       </ScrollView>
+      <ThemedText style={styles.footerText} >Tawkeer {
+        new Date().getFullYear()
+      }</ThemedText>
     </ThemedView>
   );
 }
@@ -75,6 +78,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: "800",
+    marginTop: 15,
     marginBottom: 6,
   },
   subtitle: {
@@ -147,5 +151,9 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "white",
     fontWeight: "700",
+  },
+  footerText: {
+    textAlign: "center",
+    color: "#94a3b8",
   },
 });

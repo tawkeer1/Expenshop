@@ -31,11 +31,15 @@ export interface ExpenseItem {
 }
 
 let expenseItems: ExpenseItem[] = [];
+let archivedShopping: Record<string, ShoppingListItem[]> = {};
+let archivedExpenses: Record<string, ExpenseItem[]> = {};
 
 let listeners: ((items: ShoppingListItem[]) => void)[] = [];
 
 const STORAGE_KEY_SHOPPING_LIST = "expenshop:shoppingList";
 const STORAGE_KEY_EXPENSE_ITEMS = "expenshop:expenseItems";
+const STORAGE_KEY_ARCHIVE_SHOPPING = "expenshop:archive:shoppingList";
+const STORAGE_KEY_ARCHIVE_EXPENSE = "expenshop:archive:expenseItems";
 
 const notifyListeners = () => {
   listeners.forEach((listener) => listener(getShoppingListItems()));
@@ -45,6 +49,8 @@ const savePersistedData = async () => {
   try {
     await AsyncStorage.setItem(STORAGE_KEY_SHOPPING_LIST, JSON.stringify(shoppingList));
     await AsyncStorage.setItem(STORAGE_KEY_EXPENSE_ITEMS, JSON.stringify(expenseItems));
+    await AsyncStorage.setItem(STORAGE_KEY_ARCHIVE_SHOPPING, JSON.stringify(archivedShopping));
+    await AsyncStorage.setItem(STORAGE_KEY_ARCHIVE_EXPENSE, JSON.stringify(archivedExpenses));
   } catch {
     // ignore storage errors for now
   }
@@ -57,8 +63,18 @@ const loadPersistedData = async () => {
       AsyncStorage.getItem(STORAGE_KEY_EXPENSE_ITEMS),
     ]);
 
+    const [archivedShoppingData, archivedExpenseData] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY_ARCHIVE_SHOPPING),
+      AsyncStorage.getItem(STORAGE_KEY_ARCHIVE_EXPENSE),
+    ]);
+
     shoppingList = shoppingData ? JSON.parse(shoppingData) : [];
     expenseItems = expenseData ? JSON.parse(expenseData) : [];
+    archivedShopping = archivedShoppingData ? JSON.parse(archivedShoppingData) : {};
+    archivedExpenses = archivedExpenseData ? JSON.parse(archivedExpenseData) : {};
+
+    // Archive any older items on load to keep current lists short
+    archiveOldItems();
     notifyListeners();
   } catch {
     // ignore storage errors for now
@@ -136,6 +152,85 @@ export const getExpenseItems = () => [...expenseItems];
 export const addExpenseItem = (item: ExpenseItem) => {
   expenseItems = [item, ...expenseItems];
   notifyListeners();
+  void savePersistedData();
+};
+
+export const updateExpenseItem = (
+  id: string,
+  updates: Partial<Pick<ExpenseItem, "category" | "amount" | "description" | "purchasedDate">>,
+) => {
+  expenseItems = expenseItems.map((item) => {
+    if (item.id !== id) return item;
+    return { ...item, ...(updates.category !== undefined ? { category: updates.category } : {}), ...(updates.amount !== undefined ? { amount: updates.amount } : {}), ...(updates.description !== undefined ? { description: updates.description } : {}), ...(updates.purchasedDate !== undefined ? { purchasedDate: updates.purchasedDate } : {}), };
+  });
+
+  notifyListeners();
+  void savePersistedData();
+};
+
+export const deleteExpenseItem = (id: string) => {
+  expenseItems = expenseItems.filter((item) => item.id !== id);
+  notifyListeners();
+  void savePersistedData();
+};
+
+export const deleteShoppingListItem = (id: string) => {
+  shoppingList = shoppingList.filter((item) => item.id !== id);
+  notifyListeners();
+  void savePersistedData();
+};
+
+export const getArchivedShoppingMonths = () => Object.keys(archivedShopping).sort().reverse();
+
+export const getArchivedShoppingItems = (monthKey: string) => {
+  return archivedShopping[monthKey] ? [...archivedShopping[monthKey]] : [];
+};
+
+export const getArchivedExpenseMonths = () => Object.keys(archivedExpenses).sort().reverse();
+
+export const getArchivedExpenseItems = (monthKey: string) => {
+  return archivedExpenses[monthKey] ? [...archivedExpenses[monthKey]] : [];
+};
+
+export const archiveOldItems = (referenceDate: Date = new Date()) => {
+  const currentMonth = getDateKey(referenceDate).slice(0, 7); // YYYY-MM
+
+  // Move shoppingList items not in currentMonth into archivedShopping grouped by their monthKey
+  const [toKeepShopping, toArchiveShopping] = shoppingList.reduce<[ShoppingListItem[], ShoppingListItem[]]>(
+    (acc, item) => {
+      const monthKey = item.purchasedDate.slice(0, 7);
+      if (monthKey === currentMonth) acc[0].push(item);
+      else acc[1].push(item);
+      return acc;
+    },
+    [[], []],
+  );
+
+  toArchiveShopping.forEach((item) => {
+    const key = item.purchasedDate.slice(0, 7);
+    archivedShopping[key] = archivedShopping[key] ? [item, ...archivedShopping[key]] : [item];
+  });
+
+  shoppingList = toKeepShopping;
+
+  // Move expenseItems not in currentMonth into archivedExpenses
+  const [toKeepExpenses, toArchiveExpenses] = expenseItems.reduce<[ExpenseItem[], ExpenseItem[]]>(
+    (acc, item) => {
+      const monthKey = item.purchasedDate.slice(0, 7);
+      if (monthKey === currentMonth) acc[0].push(item);
+      else acc[1].push(item);
+      return acc;
+    },
+    [[], []],
+  );
+
+  toArchiveExpenses.forEach((item) => {
+    const key = item.purchasedDate.slice(0, 7);
+    archivedExpenses[key] = archivedExpenses[key] ? [item, ...archivedExpenses[key]] : [item];
+  });
+
+  expenseItems = toKeepExpenses;
+
   void savePersistedData();
 };
 

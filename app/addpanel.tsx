@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
 import { router } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -26,7 +26,46 @@ export default function AddPanel() {
     setIsExpanded(index !== -1);
   }, []);
 
-  const handleNavigate = useCallback((screen: "shopping-list" | "expense" | "contact") => {
+  const options = useMemo(
+    () => [
+      { key: "shopping", label: "Shopping List", icon: "cart-outline", route: "shopping-list" },
+      { key: "expense", label: "Expense", icon: "card-outline", route: "expense" },
+      { key: "archive", label: "Archive", icon: "archive-outline", route: "archive" },
+      { key: "contact", label: "Contact", icon: "call-outline", route: "contact" },
+    ],
+    [],
+  );
+
+  const optionsAnimRef = useRef(
+    options.map(() => ({ opacity: new Animated.Value(0), translateY: new Animated.Value(12), scale: new Animated.Value(0.98) })),
+  );
+
+  useEffect(() => {
+    if (isExpanded) {
+      const anims = optionsAnimRef.current.map((anim) =>
+        Animated.parallel([
+          Animated.timing(anim.opacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+          Animated.spring(anim.translateY, { toValue: 0, friction: 12, useNativeDriver: true }),
+          Animated.spring(anim.scale, { toValue: 1, friction: 8, useNativeDriver: true }),
+        ]),
+      );
+      Animated.stagger(80, anims).start();
+    } else {
+      const anims = optionsAnimRef.current
+        .slice()
+        .reverse()
+        .map((anim) =>
+          Animated.parallel([
+            Animated.timing(anim.opacity, { toValue: 0, duration: 160, useNativeDriver: true }),
+            Animated.timing(anim.translateY, { toValue: 12, duration: 120, useNativeDriver: true }),
+            Animated.spring(anim.scale, { toValue: 0.98, friction: 8, useNativeDriver: true }),
+          ]),
+        );
+      Animated.stagger(40, anims).start();
+    }
+  }, [isExpanded, optionsAnimRef]);
+
+  const handleNavigate = useCallback((screen: "shopping-list" | "expense" | "contact" | "archive") => {
     bottomSheetRef.current?.close();
     setIsExpanded(false);
     router.push(`/${screen}`);
@@ -55,26 +94,31 @@ export default function AddPanel() {
         backgroundStyle={styles.sheetBackground}
       >
         <BottomSheetView style={styles.sheetContent}>
-          <Pressable
-            style={styles.option}
-            onPress={() => handleNavigate("shopping-list")}
-          >
-            <ThemedText>🛒 Shopping List</ThemedText>
-          </Pressable>
-
-          <Pressable
-            style={styles.option}
-            onPress={() => handleNavigate("expense")}
-          >
-            <ThemedText>💰 Expense</ThemedText>
-          </Pressable>
-
-          <Pressable
-            style={styles.option}
-            onPress={() => handleNavigate("contact")}
-          >
-            <ThemedText>📞 Contact</ThemedText>
-          </Pressable>
+          <View style={styles.optionList}>
+            {options.map((opt, i) => {
+              const anim = optionsAnimRef.current[i];
+              return (
+                <Animated.View
+                  key={opt.key}
+                  style={{
+                    width: "100%",
+                    opacity: anim.opacity,
+                    transform: [
+                      { translateY: anim.translateY },
+                      { scale: anim.scale },
+                    ],
+                  }}
+                >
+                  <Pressable style={styles.optionRow} onPress={() => handleNavigate(opt.route as any)}>
+                    <View style={styles.optionIcon}>
+                      <Ionicons name={opt.icon as any} size={18} color="white" />
+                    </View>
+                    <ThemedText style={styles.optionText}>{opt.label}</ThemedText>
+                  </Pressable>
+                </Animated.View>
+              );
+            })}
+          </View>
         </BottomSheetView>
       </BottomSheet>
     </>
@@ -90,15 +134,18 @@ const styles = StyleSheet.create({
   },
 
   fab: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#007AFF",
-
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#2563eb",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 21,
-    elevation: 5,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
   },
 
   sheetBackground: {
@@ -107,14 +154,40 @@ const styles = StyleSheet.create({
   },
 
   sheetContent: {
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: 10,
+    paddingBottom: 22,
     backgroundColor: "#171717",
   },
 
-  option: {
-    padding: 20,
-    borderBottomWidth: 1,
+  optionList: {
+    width: "100%",
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+
+  optionRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderColor: "#1f2937",
+    borderWidth: 2,
+  },
+
+  optionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  optionText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });

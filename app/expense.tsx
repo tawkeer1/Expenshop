@@ -1,14 +1,17 @@
+import ItemActions from "@/components/item-actions";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import {
   addExpenseItem,
+  deleteExpenseItem,
   getDateKey,
   getExpenseItems,
   getExpenseSummary,
   getShoppingListItems,
   subscribeShoppingList,
+  updateExpenseItem,
 } from "@/app/models/shoppinglist";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -24,6 +27,8 @@ const expenseCategories = [
   { label: "Groceries", icon: "basket-outline" },
   { label: "Transport", icon: "bus-outline" },
   { label: "Gym", icon: "fitness-outline" },
+  { label: "Entertainment", icon: "game-controller-outline" },
+  { label: "Office", icon: "briefcase-outline" },
 ] as const;
 
 type ExpenseCategory = (typeof expenseCategories)[number];
@@ -36,6 +41,10 @@ export default function ExpenseScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(6);
 
   useEffect(() => {
     const unsubscribe = subscribeShoppingList(() => {
@@ -83,15 +92,78 @@ export default function ExpenseScreen() {
       return;
     }
 
-    addExpenseItem({
-      id: `${Date.now()}`,
-      category: selectedCategory.label,
-      amount: value,
-      description: description.trim() || selectedCategory.label,
-      purchasedDate: getDateKey(),
-    });
+    if (editId) {
+      updateExpenseItem(editId, {
+        category: selectedCategory.label,
+        amount: value,
+        description: description.trim() || selectedCategory.label,
+      });
+      setEditId(null);
+    } else {
+      addExpenseItem({
+        id: `${Date.now()}`,
+        category: selectedCategory.label,
+        amount: value,
+        description: description.trim() || selectedCategory.label,
+        purchasedDate: getDateKey(),
+      });
+    }
 
     setModalVisible(false);
+  };
+
+  const handleEditExpense = (id: string) => {
+    const item = getExpenseItems().find((e) => e.id === id);
+    if (!item) return;
+
+    setEditId(item.id);
+    setAmount(String(item.amount));
+    setDescription(item.description || item.category || "");
+    const matchingCategory = expenseCategories.find((c) => c.label === item.category);
+    setSelectedCategory(matchingCategory ?? expenseCategories[0]);
+    setModalVisible(true);
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    deleteExpenseItem(id);
+  };
+
+  const handleOpenActions = (id: string) => {
+    setSelectedEntryId(id);
+    setActionsVisible(true);
+  };
+
+  const handleCloseActions = () => {
+    setSelectedEntryId(null);
+    setActionsVisible(false);
+  };
+
+  const handleActionsEdit = () => {
+    if (!selectedEntryId) return;
+    const entry = allExpenses.find((e) => e.id === selectedEntryId);
+    if (!entry) return;
+
+    if (entry.source === "Expense") {
+      handleEditExpense(selectedEntryId);
+    } else {
+      router.push("/shopping-list");
+    }
+  };
+
+  const handleActionsDelete = () => {
+    if (!selectedEntryId) return;
+    const entry = allExpenses.find((e) => e.id === selectedEntryId);
+    if (!entry) return;
+
+    if (entry.source === "Expense") {
+      deleteExpenseItem(selectedEntryId);
+    } else {
+      // delete shopping item
+      // import and call deleteShoppingListItem
+      // lazy import to avoid circular issues
+      const { deleteShoppingListItem } = require("@/app/models/shoppinglist");
+      deleteShoppingListItem(selectedEntryId);
+    }
   };
 
   return (
@@ -137,27 +209,47 @@ export default function ExpenseScreen() {
 
         <ThemedView style={styles.listSection}>
           <ThemedText style={styles.sectionTitle}>All expenses</ThemedText>
-          {allExpenses.length === 0 ? (
+            {allExpenses.length === 0 ? (
             <ThemedView style={styles.emptyCard}>
               <ThemedText style={styles.emptyText}>No expenses yet. Tap a category to add one.</ThemedText>
             </ThemedView>
           ) : (
-            allExpenses.map((entry) => (
-              <ThemedView key={entry.id} style={styles.expenseCard}>
-                <View style={styles.expenseRow}>
-                  <View>
-                    <ThemedText style={styles.expenseLabel}>{entry.label}</ThemedText>
-                    <ThemedText style={styles.expenseMeta}>{entry.category}</ThemedText>
+            <>
+              {(allExpenses.slice(0, visibleCount)).map((entry) => (
+                <Pressable key={entry.id} style={styles.expenseCard} onLongPress={() => handleOpenActions(entry.id)}>
+                  <View style={styles.expenseRow}>
+                    <View>
+                      <ThemedText style={styles.expenseLabel}>{entry.label}</ThemedText>
+                      <ThemedText style={styles.expenseMeta}>{entry.category}</ThemedText>
+                    </View>
+                    <ThemedText style={styles.expenseAmount}>${entry.amount.toFixed(2)}</ThemedText>
                   </View>
-                  <ThemedText style={styles.expenseAmount}>${entry.amount.toFixed(2)}</ThemedText>
-                </View>
-                <View style={styles.expenseFooter}>
-                  <ThemedText style={styles.expenseDate}>{entry.date}</ThemedText>
-                  <ThemedText style={styles.expenseSource}>{entry.source}</ThemedText>
-                </View>
-              </ThemedView>
-            ))
-          )}
+                  <View style={styles.expenseFooter}>
+                    <ThemedText style={styles.expenseDate}>{entry.date}</ThemedText>
+                    <ThemedText style={styles.expenseSource}>{entry.source}</ThemedText>
+                  </View>
+                </Pressable>
+              ))}
+              {allExpenses.length > 6 ? (
+                <Pressable
+                  style={styles.showMoreButton}
+                  onPress={() => {
+                    if (visibleCount >= allExpenses.length) {
+                      setVisibleCount(6);
+                    } else {
+                      const remaining = allExpenses.length - visibleCount;
+                      setVisibleCount((c) => c + Math.min(5, remaining));
+                    }
+                  }}
+                >
+                  <ThemedText style={styles.showMoreText}>
+                    {visibleCount >= allExpenses.length ? "Show less" : `Show ${Math.min(5, allExpenses.length - visibleCount)} more`}
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+            </>
+          )
+        }
         </ThemedView>
 
         <Pressable style={styles.button} onPress={() => router.back()}>
@@ -207,6 +299,13 @@ export default function ExpenseScreen() {
           </View>
         </View>
       </Modal>
+      <ItemActions
+        visible={actionsVisible}
+        onClose={handleCloseActions}
+        onEdit={handleActionsEdit}
+        onDelete={handleActionsDelete}
+        title="Entry options"
+      />
     </ThemedView>
   );
 }
@@ -431,5 +530,22 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "700",
     fontSize: 16,
+  },
+  entryActions: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  iconButton: {
+    padding: 6,
+    borderRadius: 8,
+  },
+  showMoreButton: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  showMoreText: {
+    color: "#2563eb",
+    fontWeight: "700",
   },
 });

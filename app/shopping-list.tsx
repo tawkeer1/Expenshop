@@ -4,12 +4,14 @@ import { Animated, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } f
 
 import {
   addShoppingListItem,
+  deleteShoppingListItem,
   getDateKey,
   getShoppingListItems,
   subscribeShoppingList,
   updateShoppingListItem,
   updateShoppingListQuantity,
 } from "@/app/models/shoppinglist";
+import ItemActions from "@/components/item-actions";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 
@@ -22,6 +24,7 @@ interface Category {
 
 const defaultCategories: Category[] = [
   { id: "milk", label: "Milk", icon: "water-outline", color: "#60a5fa" },
+  {id: "eggs", label: "Eggs", icon: "egg-outline", color: "#fbbf24" },
   { id: "bread", label: "Bread", icon: "bread-outline", color: "#fbbf24" },
   { id: "fruit", label: "Fruit", icon: "leaf-outline", color: "#34d399" },
   { id: "vegetables", label: "Vegetables", icon: "leaf-outline", color: "#10b981" },
@@ -66,6 +69,9 @@ export default function ShoppingListScreen() {
   const [editingName, setEditingName] = useState("");
   const [editingPrice, setEditingPrice] = useState("");
   const scaleAnimationsRef = useRef<Record<string, Animated.Value>>({});
+  const [actionsModalVisible, setActionsModalVisible] = useState(false);
+  const [actionsItemId, setActionsItemId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(6);
 
   const getScaleAnimation = useCallback((categoryId: string) => {
     if (!scaleAnimationsRef.current[categoryId]) {
@@ -173,6 +179,23 @@ export default function ShoppingListScreen() {
     setEditingId(null);
     setEditingName("");
     setEditingPrice("");
+  };
+
+  const handleActionsEdit = () => {
+    if (!actionsItemId) return;
+    const item = items.find((i) => i.id === actionsItemId);
+    if (!item) return;
+
+    handleStartEdit({ id: item.id, name: item.name, price: item.price });
+    setActionsModalVisible(false);
+    setActionsItemId(null);
+  };
+
+  const handleActionsDelete = () => {
+    if (!actionsItemId) return;
+    deleteShoppingListItem(actionsItemId);
+    setActionsModalVisible(false);
+    setActionsItemId(null);
   };
 
   return (
@@ -291,11 +314,14 @@ export default function ShoppingListScreen() {
         <ThemedView style={styles.listSection}>
           <ThemedText style={styles.sectionTitle}>Your current list</ThemedText>
           <ScrollView contentContainerStyle={styles.listContent}>
-            {items.map((item) => (
+            {(items.slice(0, visibleCount)).map((item) => (
               <Pressable
                 key={item.id}
                 style={styles.listCard}
-                onLongPress={() => handleStartEdit(item)}
+                onLongPress={() => {
+                  setActionsItemId(item.id);
+                  setActionsModalVisible(true);
+                }}
               >
                 {editingId === item.id ? (
                   <ThemedView style={styles.editContainer}>
@@ -349,8 +375,32 @@ export default function ShoppingListScreen() {
                 )}
               </Pressable>
             ))}
+            {items.length > 6 ? (
+              <Pressable
+                style={styles.showMoreButton}
+                onPress={() => {
+                  if (visibleCount >= items.length) {
+                    setVisibleCount(6);
+                  } else {
+                    const remaining = items.length - visibleCount;
+                    setVisibleCount((c) => c + Math.min(5, remaining));
+                  }
+                }}
+              >
+                <ThemedText style={styles.showMoreText}>
+                  {visibleCount >= items.length ? "Show less" : `Show ${Math.min(5, items.length - visibleCount)} more`}
+                </ThemedText>
+              </Pressable>
+            ) : null}
           </ScrollView>
         </ThemedView>
+        <ItemActions
+          visible={actionsModalVisible}
+          onClose={() => setActionsModalVisible(false)}
+          onEdit={handleActionsEdit}
+          onDelete={handleActionsDelete}
+          title="Item options"
+        />
       </ScrollView>
     </ThemedView>
   );
@@ -654,6 +704,14 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: "#cbd5e1",
+    fontWeight: "700",
+  },
+  showMoreButton: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  showMoreText: {
+    color: "#2563eb",
     fontWeight: "700",
   },
 });
