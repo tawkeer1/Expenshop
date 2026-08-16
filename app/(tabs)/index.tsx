@@ -1,15 +1,16 @@
 import { getExpenseSummary, subscribeShoppingList } from "@/app/models/shoppinglist";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import AddPanel from "../addpanel";
 
 export default function HomeScreen() {
   const [summary, setSummary] = useState(() => getExpenseSummary());
 
   useEffect(() => {
+    setSummary(getExpenseSummary());
+
     const unsubscribe = subscribeShoppingList(() => {
       setSummary(getExpenseSummary());
     });
@@ -23,15 +24,15 @@ export default function HomeScreen() {
         <ThemedView style={styles.summaryGrid}>
           <ThemedView style={styles.summaryCard}>
             <ThemedText style={styles.summaryLabel}>Today</ThemedText>
-            <ThemedText style={styles.amount}>${summary.dailyTotal.toFixed(1)}</ThemedText>
+            <ThemedText style={styles.amount}>₹{summary.dailyTotal.toFixed(1)}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.summaryCard}>
             <ThemedText style={styles.summaryLabel}>This month</ThemedText>
-            <ThemedText style={styles.amount}>${summary.monthlyTotal.toFixed(1)}</ThemedText>
+            <ThemedText style={styles.amount}>₹{summary.monthlyTotal.toFixed(1)}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.summaryCard}>
             <ThemedText style={styles.summaryLabel}>This year</ThemedText>
-            <ThemedText style={styles.amount}>${summary.allTimeTotal.toFixed(1)}</ThemedText>
+            <ThemedText style={styles.amount}>₹{summary.allTimeTotal.toFixed(1)}</ThemedText>
           </ThemedView>
         </ThemedView>
       </ThemedView>

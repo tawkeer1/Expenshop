@@ -20,15 +20,17 @@ import Ionicons from "@expo/vector-icons/build/Ionicons";
 const expenseCategories = [
   { label: "Electricity", icon: "flash-outline" },
   { label: "Petrol", icon: "car-outline" },
-  { label: "Water", icon: "water-outline" },
   { label: "Internet", icon: "wifi-outline" },
   { label: "Rent", icon: "home-outline" },
   { label: "Subscriptions", icon: "card-outline" },
-  { label: "Groceries", icon: "basket-outline" },
   { label: "Transport", icon: "bus-outline" },
   { label: "Gym", icon: "fitness-outline" },
   { label: "Entertainment", icon: "game-controller-outline" },
   { label: "Office", icon: "briefcase-outline" },
+  { label: "Grooming", icon: "person-outline" },
+  { label: "Zomato/Swiggy", icon: "fast-food-outline" },
+  { label: "Water", icon: "water-outline" },
+  { label: "Health", icon: "medkit-outline" },
 ] as const;
 
 type ExpenseCategory = (typeof expenseCategories)[number];
@@ -47,6 +49,10 @@ export default function ExpenseScreen() {
   const [visibleCount, setVisibleCount] = useState(6);
 
   useEffect(() => {
+    setShoppingItems(getShoppingListItems());
+    setManualExpenses(getExpenseItems());
+    setSummary(getExpenseSummary());
+
     const unsubscribe = subscribeShoppingList(() => {
       setShoppingItems(getShoppingListItems());
       setManualExpenses(getExpenseItems());
@@ -177,15 +183,15 @@ export default function ExpenseScreen() {
         <ThemedView style={styles.summaryGrid}>
           <ThemedView style={styles.summaryCard}>
             <ThemedText style={styles.summaryLabel}>Today</ThemedText>
-            <ThemedText style={styles.amount}>${summary.dailyTotal.toFixed(1)}</ThemedText>
+            <ThemedText style={styles.amount}>₹{summary.dailyTotal.toFixed(1)}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.summaryCard}>
             <ThemedText style={styles.summaryLabel}>This month</ThemedText>
-            <ThemedText style={styles.amount}>${summary.monthlyTotal.toFixed(1)}</ThemedText>
+            <ThemedText style={styles.amount}>₹{summary.monthlyTotal.toFixed(1)}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.summaryCard}>
             <ThemedText style={styles.summaryLabel}>All time</ThemedText>
-            <ThemedText style={styles.amount}>${summary.allTimeTotal.toFixed(1)}</ThemedText>
+            <ThemedText style={styles.amount}>₹{summary.allTimeTotal.toFixed(1)}</ThemedText>
           </ThemedView>
         </ThemedView>
 
@@ -222,7 +228,7 @@ export default function ExpenseScreen() {
                       <ThemedText style={styles.expenseLabel}>{entry.label}</ThemedText>
                       <ThemedText style={styles.expenseMeta}>{entry.category}</ThemedText>
                     </View>
-                    <ThemedText style={styles.expenseAmount}>${entry.amount.toFixed(2)}</ThemedText>
+                    <ThemedText style={styles.expenseAmount}>₹{entry.amount.toFixed(2)}</ThemedText>
                   </View>
                   <View style={styles.expenseFooter}>
                     <ThemedText style={styles.expenseDate}>{entry.date}</ThemedText>
@@ -304,7 +310,6 @@ export default function ExpenseScreen() {
         onClose={handleCloseActions}
         onEdit={handleActionsEdit}
         onDelete={handleActionsDelete}
-        title="Entry options"
       />
     </ThemedView>
   );
@@ -323,10 +328,13 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "800",
     marginBottom: 6,
+    marginTop: 15,
+    height: 40,
   },
   subtitle: {
     fontSize: 16,
     color: "#94a3b8",
+    marginTop: 10,
     marginBottom: 20,
     lineHeight: 22,
   },

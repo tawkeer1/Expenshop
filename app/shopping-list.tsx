@@ -41,7 +41,6 @@ const defaultCategories: Category[] = [
   { id: "office", label: "Office", icon: "document-text-outline", color: "#22c55e" },
   { id: "baby", label: "Baby", icon: "baby-outline", color: "#a855f7" },
   { id: "beauty", label: "Beauty", icon: "flower-outline", color: "#fb7185" },
-  { id: "health", label: "Health", icon: "medkit-outline", color: "#14b8a6" },
   { id: "pantry", label: "Pantry", icon: "basket-outline", color: "#f59e0b" },
   { id: "electronics", label: "Electronics", icon: "phone-portrait-outline", color: "#0f766e" },
   { id: "garden", label: "Garden", icon: "flower-outline", color: "#4ade80" },
@@ -200,7 +199,11 @@ export default function ShoppingListScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.screenContent}>
+      <ScrollView
+        contentContainerStyle={styles.screenContent}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+      >
         <ThemedText style={styles.title}></ThemedText>
 
         <ThemedView style={styles.heroCard}>
@@ -357,7 +360,7 @@ export default function ShoppingListScreen() {
                       </ThemedView>
 <ThemedText style={styles.listMeta}>{item.category}</ThemedText>
                       {/* <ThemedText style={styles.listMeta}>Price: ${item.price.toFixed(2)} each</ThemedText> */}
-                      <ThemedText style={styles.listMeta}>Total: ${(item.quantity * item.price).toFixed(2)}</ThemedText>
+                      <ThemedText style={styles.listMeta}>Total: ₹{(item.quantity * item.price).toFixed(2)}</ThemedText>
                       <ThemedText style={styles.listMeta}>Qty: {item.quantity}</ThemedText>
                       <ThemedText style={styles.listMeta}>Purchased: {item.purchasedDate}</ThemedText>
                     </ThemedView>
@@ -399,7 +402,6 @@ export default function ShoppingListScreen() {
           onClose={() => setActionsModalVisible(false)}
           onEdit={handleActionsEdit}
           onDelete={handleActionsDelete}
-          title="Item options"
         />
       </ScrollView>
     </ThemedView>

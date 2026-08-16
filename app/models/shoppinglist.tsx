@@ -234,6 +234,16 @@ export const archiveOldItems = (referenceDate: Date = new Date()) => {
   void savePersistedData();
 };
 
+const getAllShoppingItems = () => [
+  ...shoppingList,
+  ...Object.values(archivedShopping).flat(),
+];
+
+const getAllExpenseItems = () => [
+  ...expenseItems,
+  ...Object.values(archivedExpenses).flat(),
+];
+
 export const getExpenseSummary = (date = new Date()) => {
   const dayKey = getDateKey(date);
   const monthKey = dayKey.slice(0, 7);
@@ -242,28 +252,29 @@ export const getExpenseSummary = (date = new Date()) => {
   let monthlyTotal = 0;
   let allTimeTotal = 0;
 
-  shoppingList.forEach((item) => {
-    const itemCost = item.quantity * item.price;
+  getAllShoppingItems().forEach((item) => {
+    const itemCost = Number(item.quantity || 0) * Number(item.price || 0);
     allTimeTotal += itemCost;
 
     if (item.purchasedDate === dayKey) {
       dailyTotal += itemCost;
     }
 
-    if (item.purchasedDate.startsWith(monthKey)) {
+    if (item.purchasedDate && item.purchasedDate.startsWith(monthKey)) {
       monthlyTotal += itemCost;
     }
   });
 
-  expenseItems.forEach((item) => {
-    allTimeTotal += item.amount;
+  getAllExpenseItems().forEach((item) => {
+    const itemCost = Number(item.amount || 0);
+    allTimeTotal += itemCost;
 
     if (item.purchasedDate === dayKey) {
-      dailyTotal += item.amount;
+      dailyTotal += itemCost;
     }
 
-    if (item.purchasedDate.startsWith(monthKey)) {
-      monthlyTotal += item.amount;
+    if (item.purchasedDate && item.purchasedDate.startsWith(monthKey)) {
+      monthlyTotal += itemCost;
     }
   });
 

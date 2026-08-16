@@ -44,7 +44,11 @@ export default function ArchiveScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+      >
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={18} color="white" />
@@ -98,7 +102,7 @@ export default function ArchiveScreen() {
                         </View>
 
                         <View style={styles.itemRight}>
-                          <ThemedText style={styles.itemAmount}>${(it.price * it.quantity).toFixed(2)}</ThemedText>
+                          <ThemedText style={styles.itemAmount}>₹{(it.price * it.quantity).toFixed(2)}</ThemedText>
                           <ThemedText style={styles.itemDate}>{prettyDate(it.purchasedDate)}</ThemedText>
                         </View>
                       </View>
@@ -125,7 +129,7 @@ export default function ArchiveScreen() {
                         </View>
 
                         <View style={styles.itemRight}>
-                          <ThemedText style={styles.itemAmount}>${it.amount.toFixed(2)}</ThemedText>
+                          <ThemedText style={styles.itemAmount}>₹{it.amount.toFixed(2)}</ThemedText>
                           <ThemedText style={styles.itemDate}>{prettyDate(it.purchasedDate)}</ThemedText>
                         </View>
                       </View>
@@ -142,11 +146,11 @@ export default function ArchiveScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 18 },
-  content: { paddingBottom: 48 },
+  container: { flex: 1, padding: 18,},
+  content: { paddingBottom: 48, marginTop: 20 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   backButton: { padding: 8 },
-  title: { fontSize: 22, fontWeight: "800" },
+  title: { fontSize: 22, fontWeight: "800"},
   monthsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   monthButton: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: "#111827" },
   monthButtonActive: { backgroundColor: "#2563eb" },
