@@ -1,6 +1,14 @@
 import { getArchivedExpenseItems, getArchivedExpenseMonths, getArchivedShoppingItems, getArchivedShoppingMonths } from "@/app/models/shoppinglist";
+import ListSortBar from "@/components/list-sort-bar";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import {
+  sortExpenseItems,
+  sortShoppingItems,
+  type ExpenseSortField,
+  type ShoppingSortField,
+  type SortDirection,
+} from "@/utils/list-sort";
 import Ionicons from "@expo/vector-icons/build/Ionicons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -30,6 +38,10 @@ export default function ArchiveScreen() {
   const [months, setMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [viewTab, setViewTab] = useState<"shopping" | "expenses">("shopping");
+  const [shoppingSortField, setShoppingSortField] = useState<ShoppingSortField>("date");
+  const [shoppingSortDirection, setShoppingSortDirection] = useState<SortDirection>("desc");
+  const [expenseSortField, setExpenseSortField] = useState<Exclude<ExpenseSortField, "source">>("date");
+  const [expenseSortDirection, setExpenseSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
     const s = getArchivedShoppingMonths();
@@ -39,8 +51,15 @@ export default function ArchiveScreen() {
     if (setUnion.length > 0) setSelectedMonth(setUnion[0]);
   }, []);
 
-  const shoppingItems = useMemo(() => (selectedMonth ? getArchivedShoppingItems(selectedMonth) : []), [selectedMonth]);
-  const expenseItems = useMemo(() => (selectedMonth ? getArchivedExpenseItems(selectedMonth) : []), [selectedMonth]);
+  const shoppingItems = useMemo(() => {
+    const items = selectedMonth ? getArchivedShoppingItems(selectedMonth) : [];
+    return sortShoppingItems(items, shoppingSortField, shoppingSortDirection);
+  }, [selectedMonth, shoppingSortField, shoppingSortDirection]);
+
+  const expenseItems = useMemo(() => {
+    const items = selectedMonth ? getArchivedExpenseItems(selectedMonth) : [];
+    return sortExpenseItems(items, expenseSortField, expenseSortDirection);
+  }, [selectedMonth, expenseSortField, expenseSortDirection]);
 
   return (
     <ThemedView style={styles.container}>
@@ -86,6 +105,23 @@ export default function ArchiveScreen() {
             {viewTab === "shopping" ? (
               <ThemedView style={styles.section}>
                 <ThemedText style={styles.sectionTitle}>Shopping ({shoppingItems.length})</ThemedText>
+                {shoppingItems.length > 0 ? (
+                  <ListSortBar
+                    fields={[
+                      { key: "date", label: "Date" },
+                      { key: "name", label: "Name" },
+                      { key: "cost", label: "Cost" },
+                      { key: "category", label: "Category" },
+                      { key: "quantity", label: "Qty" },
+                    ]}
+                    sortField={shoppingSortField}
+                    sortDirection={shoppingSortDirection}
+                    onSortChange={(field, direction) => {
+                      setShoppingSortField(field);
+                      setShoppingSortDirection(direction);
+                    }}
+                  />
+                ) : null}
                 {shoppingItems.length === 0 ? (
                   <ThemedText style={styles.emptyText}>No items for this month.</ThemedText>
                 ) : (
@@ -113,6 +149,22 @@ export default function ArchiveScreen() {
             ) : (
               <ThemedView style={styles.section}>
                 <ThemedText style={styles.sectionTitle}>Expenses ({expenseItems.length})</ThemedText>
+                {expenseItems.length > 0 ? (
+                  <ListSortBar
+                    fields={[
+                      { key: "date", label: "Date" },
+                      { key: "name", label: "Name" },
+                      { key: "amount", label: "Amount" },
+                      { key: "category", label: "Category" },
+                    ]}
+                    sortField={expenseSortField}
+                    sortDirection={expenseSortDirection}
+                    onSortChange={(field, direction) => {
+                      setExpenseSortField(field);
+                      setExpenseSortDirection(direction);
+                    }}
+                  />
+                ) : null}
                 {expenseItems.length === 0 ? (
                   <ThemedText style={styles.emptyText}>No expenses for this month.</ThemedText>
                 ) : (

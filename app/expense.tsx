@@ -1,4 +1,5 @@
 import ItemActions from "@/components/item-actions";
+import ListSortBar from "@/components/list-sort-bar";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -15,6 +16,12 @@ import {
 } from "@/app/models/shoppinglist";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import {
+  sortExpenseEntries,
+  type ExpenseEntry,
+  type ExpenseSortField,
+  type SortDirection,
+} from "@/utils/list-sort";
 import Ionicons from "@expo/vector-icons/build/Ionicons";
 
 const expenseCategories = [
@@ -47,6 +54,8 @@ export default function ExpenseScreen() {
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
+  const [sortField, setSortField] = useState<ExpenseSortField>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
     setShoppingItems(getShoppingListItems());
@@ -62,8 +71,8 @@ export default function ExpenseScreen() {
     return unsubscribe;
   }, []);
 
-  const allExpenses = useMemo(
-    () => [
+  const allExpenses = useMemo(() => {
+    const entries: ExpenseEntry[] = [
       ...manualExpenses.map((expense) => ({
         id: expense.id,
         category: expense.category,
@@ -80,10 +89,10 @@ export default function ExpenseScreen() {
         date: item.purchasedDate,
         source: "Shopping",
       })),
-    ]
-      .sort((a, b) => b.date.localeCompare(a.date)),
-    [manualExpenses, shoppingItems],
-  );
+    ];
+
+    return sortExpenseEntries(entries, sortField, sortDirection);
+  }, [manualExpenses, shoppingItems, sortField, sortDirection]);
 
   const handleOpenCategory = (category: typeof expenseCategories[number]) => {
     setSelectedCategory(category);
@@ -215,6 +224,23 @@ export default function ExpenseScreen() {
 
         <ThemedView style={styles.listSection}>
           <ThemedText style={styles.sectionTitle}>All expenses</ThemedText>
+          {allExpenses.length > 0 ? (
+            <ListSortBar
+              fields={[
+                { key: "date", label: "Date" },
+                { key: "name", label: "Name" },
+                { key: "amount", label: "Amount" },
+                { key: "category", label: "Category" },
+                { key: "source", label: "Source" },
+              ]}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSortChange={(field, direction) => {
+                setSortField(field);
+                setSortDirection(direction);
+              }}
+            />
+          ) : null}
             {allExpenses.length === 0 ? (
             <ThemedView style={styles.emptyCard}>
               <ThemedText style={styles.emptyText}>No expenses yet. Tap a category to add one.</ThemedText>

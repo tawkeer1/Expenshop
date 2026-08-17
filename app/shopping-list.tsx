@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/build/Ionicons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import {
@@ -12,8 +12,14 @@ import {
   updateShoppingListQuantity,
 } from "@/app/models/shoppinglist";
 import ItemActions from "@/components/item-actions";
+import ListSortBar from "@/components/list-sort-bar";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import {
+  sortShoppingItems,
+  type ShoppingSortField,
+  type SortDirection,
+} from "@/utils/list-sort";
 
 interface Category {
   id: string;
@@ -71,6 +77,13 @@ export default function ShoppingListScreen() {
   const [actionsModalVisible, setActionsModalVisible] = useState(false);
   const [actionsItemId, setActionsItemId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
+  const [sortField, setSortField] = useState<ShoppingSortField>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const sortedItems = useMemo(
+    () => sortShoppingItems(items, sortField, sortDirection),
+    [items, sortField, sortDirection],
+  );
 
   const getScaleAnimation = useCallback((categoryId: string) => {
     if (!scaleAnimationsRef.current[categoryId]) {
@@ -316,8 +329,23 @@ export default function ShoppingListScreen() {
 
         <ThemedView style={styles.listSection}>
           <ThemedText style={styles.sectionTitle}>Your current list</ThemedText>
+          <ListSortBar
+            fields={[
+              { key: "date", label: "Date" },
+              { key: "name", label: "Name" },
+              { key: "cost", label: "Cost" },
+              { key: "category", label: "Category" },
+              { key: "quantity", label: "Qty" },
+            ]}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSortChange={(field, direction) => {
+              setSortField(field);
+              setSortDirection(direction);
+            }}
+          />
           <ScrollView contentContainerStyle={styles.listContent}>
-            {(items.slice(0, visibleCount)).map((item) => (
+            {(sortedItems.slice(0, visibleCount)).map((item) => (
               <Pressable
                 key={item.id}
                 style={styles.listCard}
@@ -378,20 +406,20 @@ export default function ShoppingListScreen() {
                 )}
               </Pressable>
             ))}
-            {items.length > 6 ? (
+            {sortedItems.length > 6 ? (
               <Pressable
                 style={styles.showMoreButton}
                 onPress={() => {
-                  if (visibleCount >= items.length) {
+                  if (visibleCount >= sortedItems.length) {
                     setVisibleCount(6);
                   } else {
-                    const remaining = items.length - visibleCount;
+                    const remaining = sortedItems.length - visibleCount;
                     setVisibleCount((c) => c + Math.min(5, remaining));
                   }
                 }}
               >
                 <ThemedText style={styles.showMoreText}>
-                  {visibleCount >= items.length ? "Show less" : `Show ${Math.min(5, items.length - visibleCount)} more`}
+                  {visibleCount >= sortedItems.length ? "Show less" : `Show ${Math.min(5, sortedItems.length - visibleCount)} more`}
                 </ThemedText>
               </Pressable>
             ) : null}
