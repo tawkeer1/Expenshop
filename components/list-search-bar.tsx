@@ -1,6 +1,8 @@
 import { ThemedText } from "@/components/themed-text";
 import Ionicons from "@expo/vector-icons/build/Ionicons";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import Animated, { FadeInDown, FadeOutUp, LinearTransition } from "react-native-reanimated";
 
 import {
   emptyListFilters,
@@ -34,12 +36,15 @@ export default function ListSearchBar({
   showSourceFilter = false,
   showDateFilter = true,
 }: Props) {
+  const [areFiltersVisible, setAreFiltersVisible] = useState(false);
+
   const updateFilters = (updates: Partial<ListFilterState>) => {
     onFiltersChange({ ...filters, ...updates });
   };
 
   const handleClear = () => {
     onFiltersChange(emptyListFilters);
+    setAreFiltersVisible(false);
   };
 
   return (
@@ -63,6 +68,26 @@ export default function ListSearchBar({
         ) : null}
       </View>
 
+      <Pressable
+        style={[styles.filterButton, isFilterActive(filters) && styles.filterButtonActive]}
+        onPress={() => setAreFiltersVisible((visible) => !visible)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: areFiltersVisible }}
+        accessibilityLabel="Filter items"
+      >
+        <Ionicons name="filter-outline" size={17} color={isFilterActive(filters) ? "white" : "#cbd5e1"} />
+        <ThemedText style={isFilterActive(filters) ? styles.filterButtonTextActive : styles.filterButtonText}>
+          Filter
+        </ThemedText>
+        <Ionicons
+          name={areFiltersVisible ? "chevron-up" : "chevron-down"}
+          size={16}
+          color={isFilterActive(filters) ? "white" : "#94a3b8"}
+        />
+      </Pressable>
+
+      {areFiltersVisible ? (
+        <Animated.View entering={FadeInDown.duration(180)} exiting={FadeOutUp.duration(140)} layout={LinearTransition.duration(180)} style={styles.filterPanel}>
       {showDateFilter ? (
         <>
           <ThemedText style={styles.label}>Date</ThemedText>
@@ -159,6 +184,8 @@ export default function ListSearchBar({
           </ScrollView>
         </>
       ) : null}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -186,6 +213,41 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 4,
+  },
+  filterButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#1f2937",
+  },
+  filterButtonActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
+  },
+  filterButtonText: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  filterButtonTextActive: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  filterPanel: {
+    marginTop: 10,
+    padding: 12,
+    gap: 10,
+    borderRadius: 16,
+    backgroundColor: "#0b1220",
+    borderWidth: 1,
+    borderColor: "#1f2937",
   },
   label: {
     fontSize: 13,

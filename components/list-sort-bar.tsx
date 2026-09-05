@@ -1,6 +1,8 @@
 import { ThemedText } from "@/components/themed-text";
 import Ionicons from "@expo/vector-icons/build/Ionicons";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import Animated, { FadeInDown, FadeOutUp, LinearTransition } from "react-native-reanimated";
 
 import { defaultSortDirection, type SortDirection } from "@/utils/list-sort";
 
@@ -22,6 +24,8 @@ export default function ListSortBar<T extends string>({
   sortDirection,
   onSortChange,
 }: Props<T>) {
+  const [areSortOptionsVisible, setAreSortOptionsVisible] = useState(false);
+
   const handleFieldPress = (field: T) => {
     if (field === sortField) {
       onSortChange(field, sortDirection === "asc" ? "desc" : "asc");
@@ -33,35 +37,55 @@ export default function ListSortBar<T extends string>({
 
   return (
     <View style={styles.container}>
-      <ThemedText style={styles.label}>Sort by</ThemedText>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
+      <Pressable
+        style={styles.sortButton}
+        onPress={() => setAreSortOptionsVisible((visible) => !visible)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: areSortOptionsVisible }}
+        accessibilityLabel="Sort items"
       >
-        {fields.map((field) => {
-          const isActive = sortField === field.key;
+        <Ionicons name="swap-vertical-outline" size={17} color="#cbd5e1" />
+        <ThemedText style={styles.sortButtonText}>Sort by</ThemedText>
+        <Ionicons
+          name={areSortOptionsVisible ? "chevron-up" : "chevron-down"}
+          size={16}
+          color="#94a3b8"
+        />
+      </Pressable>
 
-          return (
-            <Pressable
-              key={field.key}
-              style={[styles.chip, isActive && styles.chipActive]}
-              onPress={() => handleFieldPress(field.key)}
-            >
-              <ThemedText style={isActive ? styles.chipTextActive : styles.chipText}>
-                {field.label}
-              </ThemedText>
-              {isActive ? (
-                <Ionicons
-                  name={sortDirection === "asc" ? "arrow-up" : "arrow-down"}
-                  size={14}
-                  color="white"
-                />
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {areSortOptionsVisible ? (
+        <Animated.View
+          entering={FadeInDown.duration(180)}
+          exiting={FadeOutUp.duration(140)}
+          layout={LinearTransition.duration(180)}
+          style={styles.sortPanel}
+        >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            {fields.map((field) => {
+              const isActive = sortField === field.key;
+
+              return (
+                <Pressable
+                  key={field.key}
+                  style={[styles.chip, isActive && styles.chipActive]}
+                  onPress={() => handleFieldPress(field.key)}
+                >
+                  <ThemedText style={isActive ? styles.chipTextActive : styles.chipText}>
+                    {field.label}
+                  </ThemedText>
+                  {isActive ? (
+                    <Ionicons
+                      name={sortDirection === "asc" ? "arrow-up" : "arrow-down"}
+                      size={14}
+                      color="white"
+                    />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -70,10 +94,30 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 14,
   },
-  label: {
+  sortButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#1f2937",
+  },
+  sortButtonText: {
+    color: "#cbd5e1",
     fontSize: 13,
-    color: "#94a3b8",
-    marginBottom: 8,
+    fontWeight: "700",
+  },
+  sortPanel: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "#0b1220",
+    borderWidth: 1,
+    borderColor: "#1f2937",
   },
   chipRow: {
     flexDirection: "row",

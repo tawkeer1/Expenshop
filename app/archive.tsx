@@ -77,6 +77,19 @@ export default function ArchiveScreen() {
     [selectedMonth],
   );
 
+  const monthlyTotal = useMemo(() => {
+    const shoppingTotal = rawShoppingItems.reduce(
+      (total, item) => total + Number(item.price || 0) * Number(item.quantity || 0),
+      0,
+    );
+    const expensesTotal = rawExpenseItems.reduce(
+      (total, item) => total + Number(item.amount || 0),
+      0,
+    );
+
+    return shoppingTotal + expensesTotal;
+  }, [rawExpenseItems, rawShoppingItems]);
+
   const shoppingCategoryOptions = useMemo(
     () => getUniqueValues(rawShoppingItems.map((item) => item.category)),
     [rawShoppingItems],
@@ -129,6 +142,14 @@ export default function ArchiveScreen() {
 
         {selectedMonth ? (
           <>
+            <ThemedView style={styles.monthTotalCard}>
+              <View>
+                <ThemedText style={styles.monthTotalLabel}>Total cost for {prettyMonth(selectedMonth)}</ThemedText>
+                <ThemedText style={styles.monthTotalCaption}>Shopping and expenses</ThemedText>
+              </View>
+              <ThemedText style={styles.monthTotalAmount}>₹{monthlyTotal.toFixed(2)}</ThemedText>
+            </ThemedView>
+
             <View style={styles.tabRow}>
               <Pressable onPress={() => setViewTab("shopping")} style={[styles.tabButton, viewTab === "shopping" && styles.tabButtonActive]}>
                 <ThemedText style={viewTab === "shopping" ? styles.tabTextActive : styles.tabText}>Shopping</ThemedText>
@@ -270,6 +291,10 @@ const styles = StyleSheet.create({
   monthButtonActive: { backgroundColor: "#2563eb" },
   monthLabel: { color: "#cbd5e1" },
   monthLabelActive: { color: "white", fontWeight: "700" },
+  monthTotalCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, padding: 14, borderRadius: 16, backgroundColor: "#111827", borderWidth: 1, borderColor: "#1f2937", marginBottom: 12 },
+  monthTotalLabel: { color: "#e6eef8", fontSize: 15, fontWeight: "700" },
+  monthTotalCaption: { color: "#94a3b8", fontSize: 13, marginTop: 4 },
+  monthTotalAmount: { color: "#ffffff", fontSize: 18, fontWeight: "800", fontVariant: ["tabular-nums"] },
   tabRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
   tabButton: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: "#0f172a" },
   tabButtonActive: { backgroundColor: "#2563eb" },
