@@ -12,9 +12,17 @@ import {
   updateShoppingListQuantity,
 } from "@/app/models/shoppinglist";
 import ItemActions from "@/components/item-actions";
+import ListSearchBar from "@/components/list-search-bar";
 import ListSortBar from "@/components/list-sort-bar";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import {
+  emptyListFilters,
+  filterShoppingItems,
+  getUniqueValues,
+  isFilterActive,
+  type ListFilterState,
+} from "@/utils/list-filter";
 import {
   sortShoppingItems,
   type ShoppingSortField,
@@ -79,11 +87,21 @@ export default function ShoppingListScreen() {
   const [visibleCount, setVisibleCount] = useState(6);
   const [sortField, setSortField] = useState<ShoppingSortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [filters, setFilters] = useState<ListFilterState>(emptyListFilters);
 
-  const sortedItems = useMemo(
-    () => sortShoppingItems(items, sortField, sortDirection),
-    [items, sortField, sortDirection],
+  const categoryOptions = useMemo(
+    () => getUniqueValues(items.map((item) => item.category)),
+    [items],
   );
+
+  const displayItems = useMemo(() => {
+    const filtered = filterShoppingItems(items, filters);
+    return sortShoppingItems(filtered, sortField, sortDirection);
+  }, [items, filters, sortField, sortDirection]);
+
+  useEffect(() => {
+    setVisibleCount(6);
+  }, [filters, sortField, sortDirection]);
 
   const getScaleAnimation = useCallback((categoryId: string) => {
     if (!scaleAnimationsRef.current[categoryId]) {
@@ -329,23 +347,44 @@ export default function ShoppingListScreen() {
 
         <ThemedView style={styles.listSection}>
           <ThemedText style={styles.sectionTitle}>Your current list</ThemedText>
-          <ListSortBar
-            fields={[
-              { key: "date", label: "Date" },
-              { key: "name", label: "Name" },
-              { key: "cost", label: "Cost" },
-              { key: "category", label: "Category" },
-              { key: "quantity", label: "Qty" },
-            ]}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSortChange={(field, direction) => {
-              setSortField(field);
-              setSortDirection(direction);
-            }}
-          />
+          {items.length > 0 ? (
+            <>
+              <ListSearchBar
+                filters={filters}
+                onFiltersChange={setFilters}
+                categories={categoryOptions}
+                placeholder="Search items, categories, dates..."
+              />
+              <ListSortBar
+                fields={[
+                  { key: "date", label: "Date" },
+                  { key: "name", label: "Name" },
+                  { key: "cost", label: "Cost" },
+                  { key: "category", label: "Category" },
+                  { key: "quantity", label: "Qty" },
+                ]}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSortChange={(field, direction) => {
+                  setSortField(field);
+                  setSortDirection(direction);
+                }}
+              />
+            </>
+          ) : null}
+          {items.length === 0 ? (
+            <ThemedView style={styles.emptyCard}>
+              <ThemedText style={styles.emptyText}>No items yet. Tap "Add new item" to get started.</ThemedText>
+            </ThemedView>
+          ) : displayItems.length === 0 ? (
+            <ThemedView style={styles.emptyCard}>
+              <ThemedText style={styles.emptyText}>
+                {isFilterActive(filters) ? "No items match your search or filters." : "No items to show."}
+              </ThemedText>
+            </ThemedView>
+          ) : (
           <ScrollView contentContainerStyle={styles.listContent}>
-            {(sortedItems.slice(0, visibleCount)).map((item) => (
+            {(displayItems.slice(0, visibleCount)).map((item) => (
               <Pressable
                 key={item.id}
                 style={styles.listCard}
@@ -406,24 +445,25 @@ export default function ShoppingListScreen() {
                 )}
               </Pressable>
             ))}
-            {sortedItems.length > 6 ? (
+            {displayItems.length > 6 ? (
               <Pressable
                 style={styles.showMoreButton}
                 onPress={() => {
-                  if (visibleCount >= sortedItems.length) {
+                  if (visibleCount >= displayItems.length) {
                     setVisibleCount(6);
                   } else {
-                    const remaining = sortedItems.length - visibleCount;
+                    const remaining = displayItems.length - visibleCount;
                     setVisibleCount((c) => c + Math.min(5, remaining));
                   }
                 }}
               >
                 <ThemedText style={styles.showMoreText}>
-                  {visibleCount >= sortedItems.length ? "Show less" : `Show ${Math.min(5, sortedItems.length - visibleCount)} more`}
+                  {visibleCount >= displayItems.length ? "Show less" : `Show ${Math.min(5, displayItems.length - visibleCount)} more`}
                 </ThemedText>
               </Pressable>
             ) : null}
           </ScrollView>
+          )}
         </ThemedView>
         <ItemActions
           visible={actionsModalVisible}
@@ -627,6 +667,14 @@ const styles = StyleSheet.create({
   },
   listSection: {
     marginBottom: 24,
+  },
+  emptyCard: {
+    borderRadius: 22,
+    padding: 18,
+    backgroundColor: "#111827",
+  },
+  emptyText: {
+    color: "#94a3b8",
   },
   listContent: {
     gap: 14,

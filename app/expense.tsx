@@ -1,4 +1,5 @@
 import ItemActions from "@/components/item-actions";
+import ListSearchBar from "@/components/list-search-bar";
 import ListSortBar from "@/components/list-sort-bar";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +23,13 @@ import {
   type ExpenseSortField,
   type SortDirection,
 } from "@/utils/list-sort";
+import {
+  emptyListFilters,
+  filterExpenseEntries,
+  getUniqueValues,
+  isFilterActive,
+  type ListFilterState,
+} from "@/utils/list-filter";
 import Ionicons from "@expo/vector-icons/build/Ionicons";
 
 const expenseCategories = [
@@ -56,6 +64,11 @@ export default function ExpenseScreen() {
   const [visibleCount, setVisibleCount] = useState(6);
   const [sortField, setSortField] = useState<ExpenseSortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [filters, setFilters] = useState<ListFilterState>(emptyListFilters);
+
+  useEffect(() => {
+    setVisibleCount(6);
+  }, [filters, sortField, sortDirection]);
 
   useEffect(() => {
     setShoppingItems(getShoppingListItems());
@@ -71,8 +84,8 @@ export default function ExpenseScreen() {
     return unsubscribe;
   }, []);
 
-  const allExpenses = useMemo(() => {
-    const entries: ExpenseEntry[] = [
+  const expenseEntries = useMemo<ExpenseEntry[]>(
+    () => [
       ...manualExpenses.map((expense) => ({
         id: expense.id,
         category: expense.category,
@@ -89,10 +102,19 @@ export default function ExpenseScreen() {
         date: item.purchasedDate,
         source: "Shopping",
       })),
-    ];
+    ],
+    [manualExpenses, shoppingItems],
+  );
 
-    return sortExpenseEntries(entries, sortField, sortDirection);
-  }, [manualExpenses, shoppingItems, sortField, sortDirection]);
+  const categoryOptions = useMemo(
+    () => getUniqueValues(expenseEntries.map((entry) => entry.category)),
+    [expenseEntries],
+  );
+
+  const allExpenses = useMemo(() => {
+    const filtered = filterExpenseEntries(expenseEntries, filters);
+    return sortExpenseEntries(filtered, sortField, sortDirection);
+  }, [expenseEntries, filters, sortField, sortDirection]);
 
   const handleOpenCategory = (category: typeof expenseCategories[number]) => {
     setSelectedCategory(category);
@@ -224,26 +246,41 @@ export default function ExpenseScreen() {
 
         <ThemedView style={styles.listSection}>
           <ThemedText style={styles.sectionTitle}>All expenses</ThemedText>
-          {allExpenses.length > 0 ? (
-            <ListSortBar
-              fields={[
-                { key: "date", label: "Date" },
-                { key: "name", label: "Name" },
-                { key: "amount", label: "Amount" },
-                { key: "category", label: "Category" },
-                { key: "source", label: "Source" },
-              ]}
-              sortField={sortField}
-              sortDirection={sortDirection}
-              onSortChange={(field, direction) => {
-                setSortField(field);
-                setSortDirection(direction);
-              }}
-            />
+          {expenseEntries.length > 0 ? (
+            <>
+              <ListSearchBar
+                filters={filters}
+                onFiltersChange={setFilters}
+                categories={categoryOptions}
+                showSourceFilter
+                placeholder="Search expenses, categories, dates..."
+              />
+              <ListSortBar
+                fields={[
+                  { key: "date", label: "Date" },
+                  { key: "name", label: "Name" },
+                  { key: "amount", label: "Amount" },
+                  { key: "category", label: "Category" },
+                  { key: "source", label: "Source" },
+                ]}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSortChange={(field, direction) => {
+                  setSortField(field);
+                  setSortDirection(direction);
+                }}
+              />
+            </>
           ) : null}
-            {allExpenses.length === 0 ? (
+          {expenseEntries.length === 0 ? (
             <ThemedView style={styles.emptyCard}>
               <ThemedText style={styles.emptyText}>No expenses yet. Tap a category to add one.</ThemedText>
+            </ThemedView>
+          ) : allExpenses.length === 0 ? (
+            <ThemedView style={styles.emptyCard}>
+              <ThemedText style={styles.emptyText}>
+                {isFilterActive(filters) ? "No expenses match your search or filters." : "No expenses to show."}
+              </ThemedText>
             </ThemedView>
           ) : (
             <>
@@ -280,8 +317,7 @@ export default function ExpenseScreen() {
                 </Pressable>
               ) : null}
             </>
-          )
-        }
+          )}
         </ThemedView>
 
         <Pressable style={styles.button} onPress={() => router.back()}>
