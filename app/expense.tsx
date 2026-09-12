@@ -6,30 +6,30 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import {
-  addExpenseItem,
-  deleteExpenseItem,
-  getDateKey,
-  getExpenseItems,
-  getExpenseSummary,
-  getShoppingListItems,
-  subscribeShoppingList,
-  updateExpenseItem,
+    addExpenseItem,
+    deleteExpenseItem,
+    getDateKey,
+    getExpenseItems,
+    getExpenseSummary,
+    getShoppingListItems,
+    subscribeShoppingList,
+    updateExpenseItem,
 } from "@/app/models/shoppinglist";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
-  sortExpenseEntries,
-  type ExpenseEntry,
-  type ExpenseSortField,
-  type SortDirection,
-} from "@/utils/list-sort";
-import {
-  emptyListFilters,
-  filterExpenseEntries,
-  getUniqueValues,
-  isFilterActive,
-  type ListFilterState,
+    emptyListFilters,
+    filterExpenseEntries,
+    getUniqueValues,
+    isFilterActive,
+    type ListFilterState,
 } from "@/utils/list-filter";
+import {
+    sortExpenseEntries,
+    type ExpenseEntry,
+    type ExpenseSortField,
+    type SortDirection,
+} from "@/utils/list-sort";
 import Ionicons from "@expo/vector-icons/build/Ionicons";
 
 const expenseCategories = [
@@ -56,6 +56,7 @@ export default function ExpenseScreen() {
   const [manualExpenses, setManualExpenses] = useState(() => getExpenseItems());
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>(expenseCategories[0]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
@@ -115,6 +116,8 @@ export default function ExpenseScreen() {
     const filtered = filterExpenseEntries(expenseEntries, filters);
     return sortExpenseEntries(filtered, sortField, sortDirection);
   }, [expenseEntries, filters, sortField, sortDirection]);
+
+  const handleToggleForm = () => setIsFormOpen((prev) => !prev);
 
   const handleOpenCategory = (category: typeof expenseCategories[number]) => {
     setSelectedCategory(category);
@@ -226,23 +229,37 @@ export default function ExpenseScreen() {
           </ThemedView>
         </ThemedView>
 
-        <ThemedView style={styles.expenseSection}>
-          <ThemedText style={styles.sectionTitle}>Tap a category to add an expense</ThemedText>
-          <View style={styles.categoryGrid}>
-            {expenseCategories.map((category) => (
-              <Pressable
-                key={category.label}
-                style={styles.categoryButton}
-                onPress={() => handleOpenCategory(category)}
-              >
-                <View style={styles.categoryIconWrapper}>
-                  <Ionicons name={category.icon} size={20} color="white" />
-                </View>
-                <ThemedText style={styles.categoryLabel}>{category.label}</ThemedText>
-              </Pressable>
-            ))}
-          </View>
+        <ThemedView style={styles.heroCard}>
+          <ThemedText style={styles.heroTitle}>Quick, clean expense tracking</ThemedText>
+          <ThemedText style={styles.heroSubtitle}>Tap to add your expense</ThemedText>
+
+          <Pressable style={styles.heroAction} onPress={handleToggleForm}>
+            <Ionicons name={isFormOpen ? "close-circle" : "add-circle"} size={22} color="white" />
+            <ThemedText style={styles.heroActionText}>
+              {isFormOpen ? "Hide categories" : "Add new item"}
+            </ThemedText>
+          </Pressable>
         </ThemedView>
+
+        {isFormOpen ? (
+          <ThemedView style={styles.formCard}>
+            <ThemedText style={styles.sectionTitle}>Pick a category</ThemedText>
+            <View style={styles.categoryGrid}>
+              {expenseCategories.map((category) => (
+                <Pressable
+                  key={category.label}
+                  style={styles.categoryButton}
+                  onPress={() => handleOpenCategory(category)}
+                >
+                  <View style={styles.categoryIconWrapper}>
+                    <Ionicons name={category.icon} size={20} color="white" />
+                  </View>
+                  <ThemedText style={styles.categoryLabel}>{category.label}</ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </ThemedView>
+        ) : null}
 
         <ThemedView style={styles.listSection}>
           <ThemedText style={styles.sectionTitle}>All expenses</ThemedText>
@@ -421,8 +438,42 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "white",
   },
-  expenseSection: {
-    marginBottom: 24,
+  heroCard: {
+    borderRadius: 24,
+    padding: 20,
+    backgroundColor: "#154cc2",
+    marginBottom: 18,
+  },
+  heroTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 8,
+    color: "white",
+  },
+  heroSubtitle: {
+    color: "#cbd5e1",
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  heroAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#000000",
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  heroActionText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  formCard: {
+    marginBottom: 18,
+    padding: 18,
+    borderRadius: 24,
+    backgroundColor: "#171717",
   },
   sectionTitle: {
     fontSize: 18,
