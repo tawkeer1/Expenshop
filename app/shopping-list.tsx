@@ -76,7 +76,9 @@ export default function ShoppingListScreen() {
   const [price, setPrice] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
-  const [categories, setCategories] = useState<Category[]>(defaultCategories);
+  const [categories, setCategories] = useState<Category[]>(() =>
+    [...defaultCategories].sort((a, b) => a.label.localeCompare(b.label)),
+  );
   const [selectedCategory, setSelectedCategory] = useState<Category>(defaultCategories[0]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -214,7 +216,9 @@ export default function ShoppingListScreen() {
       color: "#8b5cf6",
     };
 
-    setCategories([customCategory, ...categories]);
+    setCategories((currentCategories) =>
+      [...currentCategories, customCategory].sort((a, b) => a.label.localeCompare(b.label)),
+    );
     setSelectedCategory(customCategory);
     setNewCategoryName("");
   };

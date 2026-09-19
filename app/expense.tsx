@@ -34,19 +34,19 @@ import {
 import Ionicons from "@expo/vector-icons/build/Ionicons";
 
 const expenseCategories = [
-  { label: "Electricity", icon: "flash-outline" },
-  { label: "Petrol", icon: "car-outline" },
-  { label: "Internet", icon: "wifi-outline" },
-  { label: "Rent", icon: "home-outline" },
-  { label: "Subscriptions", icon: "card-outline" },
-  { label: "Transport", icon: "bus-outline" },
-  { label: "Gym", icon: "fitness-outline" },
-  { label: "Entertainment", icon: "game-controller-outline" },
-  { label: "Office", icon: "briefcase-outline" },
-  { label: "Grooming", icon: "person-outline" },
-  { label: "Zomato/Swiggy", icon: "fast-food-outline" },
-  { label: "Water", icon: "water-outline" },
-  { label: "Health", icon: "medkit-outline" },
+  { label: "Electricity", icon: "flash-outline", color: "#f59e0b" },
+  { label: "Entertainment", icon: "game-controller-outline", color: "#8b5cf6" },
+  { label: "Grooming", icon: "person-outline", color: "#ec4899" },
+  { label: "Gym", icon: "fitness-outline", color: "#14b8a6" },
+  { label: "Health", icon: "medkit-outline", color: "#ef4444" },
+  { label: "Internet", icon: "wifi-outline", color: "#3b82f6" },
+  { label: "Office", icon: "briefcase-outline", color: "#22c55e" },
+  { label: "Petrol", icon: "car-outline", color: "#f97316" },
+  { label: "Rent", icon: "home-outline", color: "#6366f1" },
+  { label: "Subscriptions", icon: "card-outline", color: "#a855f7" },
+  { label: "Transport", icon: "bus-outline", color: "#0ea5e9" },
+  { label: "Water", icon: "water-outline", color: "#38bdf8" },
+  { label: "Zomato/Swiggy", icon: "fast-food-outline", color: "#fb7185" },
 ] as const;
 
 type ExpenseCategory = (typeof expenseCategories)[number];
@@ -288,7 +288,7 @@ export default function ExpenseScreen() {
                   style={styles.categoryButton}
                   onPress={() => handleOpenCategory(category)}
                 >
-                  <View style={styles.categoryIconWrapper}>
+                  <View style={[styles.categoryIconWrapper, { backgroundColor: category.color }]}>
                     <Ionicons name={category.icon} size={20} color="white" />
                   </View>
                   <ThemedText style={styles.categoryLabel}>{category.label}</ThemedText>
@@ -418,7 +418,7 @@ export default function ExpenseScreen() {
             </View>
 
             <View style={styles.selectedCategoryRow}>
-              <View style={styles.categoryIconWrapperLarge}>
+              <View style={[styles.categoryIconWrapperLarge, { backgroundColor: selectedCategory.color }]}>
                 <Ionicons name={selectedCategory.icon} size={22} color="white" />
               </View>
               <ThemedText style={styles.selectedCategoryText}>{selectedCategory.label}</ThemedText>
