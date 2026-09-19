@@ -1,6 +1,7 @@
 import ItemActions from "@/components/item-actions";
 import ListSearchBar from "@/components/list-search-bar";
 import ListSortBar from "@/components/list-sort-bar";
+import SelectionTotalBar from "@/components/selection-total-bar";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -66,6 +67,8 @@ export default function ExpenseScreen() {
   const [sortField, setSortField] = useState<ExpenseSortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [filters, setFilters] = useState<ListFilterState>(emptyListFilters);
+  const [isSelectingItems, setIsSelectingItems] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setVisibleCount(6);
@@ -116,6 +119,40 @@ export default function ExpenseScreen() {
     const filtered = filterExpenseEntries(expenseEntries, filters);
     return sortExpenseEntries(filtered, sortField, sortDirection);
   }, [expenseEntries, filters, sortField, sortDirection]);
+
+  const selectedCategoryMonthlyTotal = useMemo(() => {
+    if (!filters.category) {
+      return null;
+    }
+
+    const currentMonth = getDateKey().slice(0, 7);
+    return expenseEntries
+      .filter((entry) => entry.category === filters.category && entry.date.startsWith(currentMonth))
+      .reduce((total, entry) => total + Number(entry.amount || 0), 0);
+  }, [expenseEntries, filters.category]);
+
+  const selectedEntries = useMemo(
+    () => expenseEntries.filter((entry) => selectedItemIds.has(entry.id)),
+    [expenseEntries, selectedItemIds],
+  );
+
+  const selectedItemsTotal = useMemo(
+    () => selectedEntries.reduce((total, entry) => total + entry.amount, 0),
+    [selectedEntries],
+  );
+
+  const toggleItemSelection = (id: string) => {
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectionMode = () => {
+    setIsSelectingItems((active) => !active);
+    setSelectedItemIds(new Set());
+  };
 
   const handleToggleForm = () => setIsFormOpen((prev) => !prev);
 
@@ -287,6 +324,23 @@ export default function ExpenseScreen() {
                   setSortDirection(direction);
                 }}
               />
+              {selectedCategoryMonthlyTotal !== null ? (
+                <ThemedView style={styles.categoryTotalCard}>
+                  <ThemedText style={styles.categoryTotalLabel}>
+                    {filters.category} spent this month
+                  </ThemedText>
+                  <ThemedText style={styles.categoryTotalAmount}>
+                    ₹{selectedCategoryMonthlyTotal.toFixed(2)}
+                  </ThemedText>
+                </ThemedView>
+              ) : null}
+              <SelectionTotalBar
+                active={isSelectingItems}
+                count={selectedEntries.length}
+                total={selectedItemsTotal}
+                onToggle={toggleSelectionMode}
+                onClear={() => setSelectedItemIds(new Set())}
+              />
             </>
           ) : null}
           {expenseEntries.length === 0 ? (
@@ -302,8 +356,18 @@ export default function ExpenseScreen() {
           ) : (
             <>
               {(allExpenses.slice(0, visibleCount)).map((entry) => (
-                <Pressable key={entry.id} style={styles.expenseCard} onLongPress={() => handleOpenActions(entry.id)}>
+                <Pressable
+                  key={entry.id}
+                  style={[styles.expenseCard, isSelectingItems && selectedItemIds.has(entry.id) && styles.expenseCardSelected]}
+                  onPress={isSelectingItems ? () => toggleItemSelection(entry.id) : undefined}
+                  onLongPress={isSelectingItems ? undefined : () => handleOpenActions(entry.id)}
+                >
                   <View style={styles.expenseRow}>
+                    {isSelectingItems ? (
+                      <View style={[styles.selectionIndicator, selectedItemIds.has(entry.id) && styles.selectionIndicatorActive]}>
+                        {selectedItemIds.has(entry.id) ? <Ionicons name="checkmark" size={15} color="white" /> : null}
+                      </View>
+                    ) : null}
                     <View>
                       <ThemedText style={styles.expenseLabel}>{entry.label}</ThemedText>
                       <ThemedText style={styles.expenseMeta}>{entry.category}</ThemedText>
@@ -428,6 +492,30 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#111827",
   },
+  categoryTotalCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#102a43",
+    borderWidth: 1,
+    borderColor: "#1d4ed8",
+  },
+  categoryTotalLabel: {
+    flex: 1,
+    color: "#dbeafe",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  categoryTotalAmount: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
   summaryLabel: {
     fontSize: 14,
     color: "#cbd5e1",
@@ -528,6 +616,23 @@ const styles = StyleSheet.create({
     padding: 18,
     backgroundColor: "#111827",
     marginBottom: 12,
+  },
+  expenseCardSelected: {
+    borderColor: "#3b82f6",
+    backgroundColor: "#102a43",
+  },
+  selectionIndicator: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#64748b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectionIndicatorActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
   },
   expenseRow: {
     flexDirection: "row",

@@ -1,6 +1,7 @@
 import { getArchivedExpenseItems, getArchivedExpenseMonths, getArchivedShoppingItems, getArchivedShoppingMonths } from "@/app/models/shoppinglist";
 import ListSearchBar from "@/components/list-search-bar";
 import ListSortBar from "@/components/list-sort-bar";
+import SelectionTotalBar from "@/components/selection-total-bar";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
@@ -53,10 +54,14 @@ export default function ArchiveScreen() {
   const [expenseSortDirection, setExpenseSortDirection] = useState<SortDirection>("desc");
   const [shoppingFilters, setShoppingFilters] = useState<ListFilterState>(emptyListFilters);
   const [expenseFilters, setExpenseFilters] = useState<ListFilterState>(emptyListFilters);
+  const [isSelectingItems, setIsSelectingItems] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setShoppingFilters(emptyListFilters);
     setExpenseFilters(emptyListFilters);
+    setIsSelectingItems(false);
+    setSelectedItemIds(new Set());
   }, [selectedMonth, viewTab]);
 
   useEffect(() => {
@@ -109,6 +114,49 @@ export default function ArchiveScreen() {
     const filtered = filterExpenseItems(rawExpenseItems, expenseFilters);
     return sortExpenseItems(filtered, expenseSortField, expenseSortDirection);
   }, [rawExpenseItems, expenseFilters, expenseSortField, expenseSortDirection]);
+
+  const selectedShoppingCategoryTotal = useMemo(() => {
+    if (!shoppingFilters.category) {
+      return null;
+    }
+
+    return rawShoppingItems
+      .filter((item) => item.category === shoppingFilters.category)
+      .reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0), 0);
+  }, [rawShoppingItems, shoppingFilters.category]);
+
+  const selectedExpenseCategoryTotal = useMemo(() => {
+    if (!expenseFilters.category) {
+      return null;
+    }
+
+    return rawExpenseItems
+      .filter((item) => item.category === expenseFilters.category)
+      .reduce((total, item) => total + Number(item.amount || 0), 0);
+  }, [expenseFilters.category, rawExpenseItems]);
+
+  const selectedShoppingItems = useMemo(
+    () => rawShoppingItems.filter((item) => selectedItemIds.has(item.id)),
+    [rawShoppingItems, selectedItemIds],
+  );
+
+  const selectedExpenseItems = useMemo(
+    () => rawExpenseItems.filter((item) => selectedItemIds.has(item.id)),
+    [rawExpenseItems, selectedItemIds],
+  );
+
+  const toggleItemSelection = (id: string) => {
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectionMode = () => {
+    setIsSelectingItems((active) => !active);
+    setSelectedItemIds(new Set());
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -186,6 +234,23 @@ export default function ArchiveScreen() {
                         setShoppingSortDirection(direction);
                       }}
                     />
+                    {selectedShoppingCategoryTotal !== null ? (
+                      <ThemedView style={styles.categoryTotalCard}>
+                        <ThemedText style={styles.categoryTotalLabel}>
+                          {shoppingFilters.category} spent in {prettyMonth(selectedMonth)}
+                        </ThemedText>
+                        <ThemedText style={styles.categoryTotalAmount}>
+                          ₹{selectedShoppingCategoryTotal.toFixed(2)}
+                        </ThemedText>
+                      </ThemedView>
+                    ) : null}
+                    <SelectionTotalBar
+                      active={isSelectingItems}
+                      count={selectedShoppingItems.length}
+                      total={selectedShoppingItems.reduce((total, item) => total + item.price * item.quantity, 0)}
+                      onToggle={toggleSelectionMode}
+                      onClear={() => setSelectedItemIds(new Set())}
+                    />
                   </>
                 ) : null}
                 {rawShoppingItems.length === 0 ? (
@@ -196,10 +261,18 @@ export default function ArchiveScreen() {
                   </ThemedText>
                 ) : (
                   shoppingItems.map((it) => (
-                    <ThemedView key={it.id} style={styles.itemCard}>
+                    <Pressable
+                      key={it.id}
+                      style={[styles.itemCard, isSelectingItems && selectedItemIds.has(it.id) && styles.itemCardSelected]}
+                      onPress={isSelectingItems ? () => toggleItemSelection(it.id) : undefined}
+                    >
                       <View style={styles.itemRow}>
                         <View style={styles.itemLeft}>
-                          <Ionicons name="cart-outline" size={20} color="#cbd5e1" />
+                          {isSelectingItems ? (
+                            <View style={[styles.selectionIndicator, selectedItemIds.has(it.id) && styles.selectionIndicatorActive]}>
+                              {selectedItemIds.has(it.id) ? <Ionicons name="checkmark" size={15} color="white" /> : null}
+                            </View>
+                          ) : <Ionicons name="cart-outline" size={20} color="#cbd5e1" />}
                         </View>
 
                         <View style={styles.itemCenter}>
@@ -212,7 +285,7 @@ export default function ArchiveScreen() {
                           <ThemedText style={styles.itemDate}>{prettyDate(it.purchasedDate)}</ThemedText>
                         </View>
                       </View>
-                    </ThemedView>
+                    </Pressable>
                   ))
                 )}
               </ThemedView>
@@ -242,6 +315,23 @@ export default function ArchiveScreen() {
                         setExpenseSortDirection(direction);
                       }}
                     />
+                    {selectedExpenseCategoryTotal !== null ? (
+                      <ThemedView style={styles.categoryTotalCard}>
+                        <ThemedText style={styles.categoryTotalLabel}>
+                          {expenseFilters.category} spent in {prettyMonth(selectedMonth)}
+                        </ThemedText>
+                        <ThemedText style={styles.categoryTotalAmount}>
+                          ₹{selectedExpenseCategoryTotal.toFixed(2)}
+                        </ThemedText>
+                      </ThemedView>
+                    ) : null}
+                    <SelectionTotalBar
+                      active={isSelectingItems}
+                      count={selectedExpenseItems.length}
+                      total={selectedExpenseItems.reduce((total, item) => total + item.amount, 0)}
+                      onToggle={toggleSelectionMode}
+                      onClear={() => setSelectedItemIds(new Set())}
+                    />
                   </>
                 ) : null}
                 {rawExpenseItems.length === 0 ? (
@@ -252,10 +342,18 @@ export default function ArchiveScreen() {
                   </ThemedText>
                 ) : (
                   expenseItems.map((it) => (
-                    <ThemedView key={it.id} style={styles.itemCard}>
+                    <Pressable
+                      key={it.id}
+                      style={[styles.itemCard, isSelectingItems && selectedItemIds.has(it.id) && styles.itemCardSelected]}
+                      onPress={isSelectingItems ? () => toggleItemSelection(it.id) : undefined}
+                    >
                       <View style={styles.itemRow}>
                         <View style={styles.itemLeft}>
-                          <Ionicons name="card-outline" size={20} color="#cbd5e1" />
+                          {isSelectingItems ? (
+                            <View style={[styles.selectionIndicator, selectedItemIds.has(it.id) && styles.selectionIndicatorActive]}>
+                              {selectedItemIds.has(it.id) ? <Ionicons name="checkmark" size={15} color="white" /> : null}
+                            </View>
+                          ) : <Ionicons name="card-outline" size={20} color="#cbd5e1" />}
                         </View>
 
                         <View style={styles.itemCenter}>
@@ -268,7 +366,7 @@ export default function ArchiveScreen() {
                           <ThemedText style={styles.itemDate}>{prettyDate(it.purchasedDate)}</ThemedText>
                         </View>
                       </View>
-                    </ThemedView>
+                    </Pressable>
                   ))
                 )}
               </ThemedView>
@@ -300,11 +398,17 @@ const styles = StyleSheet.create({
   tabButtonActive: { backgroundColor: "#2563eb" },
   tabText: { color: "#cbd5e1" },
   tabTextActive: { color: "white", fontWeight: "700" },
+  categoryTotalCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, padding: 14, borderRadius: 16, backgroundColor: "#102a43", borderWidth: 1, borderColor: "#1d4ed8" },
+  categoryTotalLabel: { flex: 1, color: "#dbeafe", fontSize: 14, fontWeight: "700" },
+  categoryTotalAmount: { color: "white", fontSize: 18, fontWeight: "800", fontVariant: ["tabular-nums"] },
   section: { marginBottom: 18 },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
   itemCard: { padding: 10, borderRadius: 12, backgroundColor: "#0b1220", marginBottom: 10, borderWidth: 1, borderColor: "#0f172a" },
+  itemCardSelected: { borderColor: "#3b82f6", backgroundColor: "#102a43" },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   itemLeft: { width: 36, alignItems: "center", justifyContent: "center" },
+  selectionIndicator: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: "#64748b", alignItems: "center", justifyContent: "center" },
+  selectionIndicatorActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
   itemCenter: { flex: 1 },
   itemRight: { alignItems: "flex-end", minWidth: 84 },
   itemTitle: { fontSize: 15, fontWeight: "700", color: "#e6eef8" },

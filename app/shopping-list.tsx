@@ -14,6 +14,7 @@ import {
 import ItemActions from "@/components/item-actions";
 import ListSearchBar from "@/components/list-search-bar";
 import ListSortBar from "@/components/list-sort-bar";
+import SelectionTotalBar from "@/components/selection-total-bar";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
@@ -88,6 +89,8 @@ export default function ShoppingListScreen() {
   const [sortField, setSortField] = useState<ShoppingSortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [filters, setFilters] = useState<ListFilterState>(emptyListFilters);
+  const [isSelectingItems, setIsSelectingItems] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
 
   const categoryOptions = useMemo(
     () => getUniqueValues(items.map((item) => item.category)),
@@ -98,6 +101,39 @@ export default function ShoppingListScreen() {
     const filtered = filterShoppingItems(items, filters);
     return sortShoppingItems(filtered, sortField, sortDirection);
   }, [items, filters, sortField, sortDirection]);
+
+  const selectedCategoryMonthlyTotal = useMemo(() => {
+    if (!filters.category) {
+      return null;
+    }
+
+    return items
+      .filter((item) => item.category === filters.category)
+      .reduce((total, item) => total + Number(item.quantity || 0) * Number(item.price || 0), 0);
+  }, [filters.category, items]);
+
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedItemIds.has(item.id)),
+    [items, selectedItemIds],
+  );
+
+  const selectedItemsTotal = useMemo(
+    () => selectedItems.reduce((total, item) => total + item.quantity * item.price, 0),
+    [selectedItems],
+  );
+
+  const toggleItemSelection = (id: string) => {
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectionMode = () => {
+    setIsSelectingItems((active) => !active);
+    setSelectedItemIds(new Set());
+  };
 
   useEffect(() => {
     setVisibleCount(6);
@@ -370,6 +406,23 @@ export default function ShoppingListScreen() {
                   setSortDirection(direction);
                 }}
               />
+              {selectedCategoryMonthlyTotal !== null ? (
+                <ThemedView style={styles.categoryTotalCard}>
+                  <ThemedText style={styles.categoryTotalLabel}>
+                    {filters.category} spent this month
+                  </ThemedText>
+                  <ThemedText style={styles.categoryTotalAmount}>
+                    ₹{selectedCategoryMonthlyTotal.toFixed(2)}
+                  </ThemedText>
+                </ThemedView>
+              ) : null}
+              <SelectionTotalBar
+                active={isSelectingItems}
+                count={selectedItems.length}
+                total={selectedItemsTotal}
+                onToggle={toggleSelectionMode}
+                onClear={() => setSelectedItemIds(new Set())}
+              />
             </>
           ) : null}
           {items.length === 0 ? (
@@ -387,8 +440,9 @@ export default function ShoppingListScreen() {
             {(displayItems.slice(0, visibleCount)).map((item) => (
               <Pressable
                 key={item.id}
-                style={styles.listCard}
-                onLongPress={() => {
+                style={[styles.listCard, isSelectingItems && selectedItemIds.has(item.id) && styles.listCardSelected]}
+                onPress={isSelectingItems ? () => toggleItemSelection(item.id) : undefined}
+                onLongPress={isSelectingItems ? undefined : () => {
                   setActionsItemId(item.id);
                   setActionsModalVisible(true);
                 }}
@@ -421,6 +475,11 @@ export default function ShoppingListScreen() {
                   </ThemedView>
                 ) : (
                   <ThemedView style={styles.cardRow}>
+                    {isSelectingItems ? (
+                      <View style={[styles.selectionIndicator, selectedItemIds.has(item.id) && styles.selectionIndicatorActive]}>
+                        {selectedItemIds.has(item.id) ? <Ionicons name="checkmark" size={15} color="white" /> : null}
+                      </View>
+                    ) : null}
                     <ThemedView style={styles.cardInfo}>
                       <ThemedView style={styles.listHeaderRow}>
                         <ThemedText style={styles.listName}>{item.name}</ThemedText>
@@ -668,6 +727,30 @@ const styles = StyleSheet.create({
   listSection: {
     marginBottom: 24,
   },
+  categoryTotalCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#102a43",
+    borderWidth: 1,
+    borderColor: "#1d4ed8",
+  },
+  categoryTotalLabel: {
+    flex: 1,
+    color: "#dbeafe",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  categoryTotalAmount: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
   emptyCard: {
     borderRadius: 22,
     padding: 18,
@@ -690,6 +773,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 20,
     elevation: 8,
+  },
+  listCardSelected: {
+    borderColor: "#3b82f6",
+    backgroundColor: "#102a43",
+  },
+  selectionIndicator: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#64748b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectionIndicatorActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
   },
   cardRow: {
     flexDirection: "row",
