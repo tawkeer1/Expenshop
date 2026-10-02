@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 48, marginTop: 20 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   backButton: { padding: 8 },
-  title: { fontSize: 22, fontWeight: "800"},
+  title: { fontSize: 22, fontWeight: "800", height: 50, marginTop: 3},
   monthsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   monthButton: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: "#111827" },
   monthButtonActive: { backgroundColor: "#2563eb" },

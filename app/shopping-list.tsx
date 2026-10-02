@@ -1,899 +1,143 @@
-import Ionicons from "@expo/vector-icons/build/Ionicons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+﻿import Ionicons from "@expo/vector-icons/build/Ionicons";
+import { useEffect, useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import {
   addShoppingListItem,
   deleteShoppingListItem,
   getDateKey,
   getShoppingListItems,
+  markShoppingListItemBought,
   subscribeShoppingList,
   updateShoppingListItem,
   updateShoppingListQuantity,
+  type ShoppingListItem,
 } from "@/app/models/shoppinglist";
-import ItemActions from "@/components/item-actions";
-import ListSearchBar from "@/components/list-search-bar";
-import ListSortBar from "@/components/list-sort-bar";
-import SelectionTotalBar from "@/components/selection-total-bar";
+import { purchaseCategories, type PurchaseCategory } from "@/app/models/purchase-categories";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import {
-  emptyListFilters,
-  filterShoppingItems,
-  getUniqueValues,
-  isFilterActive,
-  type ListFilterState,
-} from "@/utils/list-filter";
-import {
-  sortShoppingItems,
-  type ShoppingSortField,
-  type SortDirection,
-} from "@/utils/list-sort";
-
-interface Category {
-  id: string;
-  label: string;
-  icon: string;
-  color: string;
-}
-
-const defaultCategories: Category[] = [
-  { id: "milk", label: "Milk", icon: "water-outline", color: "#60a5fa" },
-  {id: "eggs", label: "Eggs", icon: "egg-outline", color: "#fbbf24" },
-  { id: "bread", label: "Bread", icon: "bread-outline", color: "#fbbf24" },
-  { id: "fruit", label: "Fruit", icon: "leaf-outline", color: "#34d399" },
-  { id: "vegetables", label: "Vegetables", icon: "leaf-outline", color: "#10b981" },
-  { id: "snacks", label: "Snacks", icon: "fast-food-outline", color: "#f97316" },
-  { id: "coffee", label: "Coffee", icon: "cafe-outline", color: "#fb7185" },
-  { id: "dairy", label: "Dairy", icon: "ice-cream-outline", color: "#7c3aed" },
-  { id: "meat", label: "Meat", icon: "restaurant-outline", color: "#ef4444" },
-  { id: "seafood", label: "Seafood", icon: "fish-outline", color: "#3b82f6" },
-  { id: "frozen", label: "Frozen", icon: "snow-outline", color: "#38bdf8" },
-  { id: "cleaning", label: "Cleaning", icon: "brush-outline", color: "#0ea5e9" },
-  { id: "household", label: "Household", icon: "home-outline", color: "#8b5cf6" },
-  { id: "personal-care", label: "Personal Care", icon: "heart-outline", color: "#ec4899" },
-  { id: "pet", label: "Pet Supplies", icon: "paw-outline", color: "#f97316" },
-  { id: "office", label: "Office", icon: "document-text-outline", color: "#22c55e" },
-  { id: "baby", label: "Baby", icon: "baby-outline", color: "#a855f7" },
-  { id: "beauty", label: "Beauty", icon: "flower-outline", color: "#fb7185" },
-  { id: "pantry", label: "Pantry", icon: "basket-outline", color: "#f59e0b" },
-  { id: "electronics", label: "Electronics", icon: "phone-portrait-outline", color: "#0f766e" },
-  { id: "garden", label: "Garden", icon: "flower-outline", color: "#4ade80" },
-  { id: "cooking", label: "Cooking", icon: "restaurant-outline", color: "#f97316" },
-  { id: "stationery", label: "Stationery", icon: "pencil-outline", color: "#6366f1" },
-  { id: "baking", label: "Baking", icon: "bonfire-outline", color: "#facc15" },
-  { id: "beverages", label: "Beverages", icon: "wine-outline", color: "#7c3aed" },
-  { id: "grains", label: "Grains", icon: "basket-outline", color: "#22c55e" },
-  { id: "spices", label: "Spices", icon: "flame-outline", color: "#ef4444" },
-  { id: "sports", label: "Sports", icon: "fitness-outline", color: "#14b8a6" },
-  { id: "paper", label: "Paper Goods", icon: "document-text-outline", color: "#64748b" },
-];
+import ItemActions from "@/components/item-actions";
 
 export default function ShoppingListScreen() {
-  const [items, setItems] = useState(getShoppingListItems);
+  const [items, setItems] = useState<ShoppingListItem[]>(getShoppingListItems());
+  const [category, setCategory] = useState<PurchaseCategory>(purchaseCategories[0]);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
-  const [price, setPrice] = useState("");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
-  const [categories, setCategories] = useState<Category[]>(() =>
-    [...defaultCategories].sort((a, b) => a.label.localeCompare(b.label)),
-  );
-  const [selectedCategory, setSelectedCategory] = useState<Category>(defaultCategories[0]);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState("");
-  const [editingPrice, setEditingPrice] = useState("");
-  const scaleAnimationsRef = useRef<Record<string, Animated.Value>>({});
-  const [actionsModalVisible, setActionsModalVisible] = useState(false);
+  const [boughtItem, setBoughtItem] = useState<ShoppingListItem | null>(null);
+  const [boughtQuantity, setBoughtQuantity] = useState("1");
+  const [unitCost, setUnitCost] = useState("");
   const [actionsItemId, setActionsItemId] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(6);
-  const [sortField, setSortField] = useState<ShoppingSortField>("date");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [filters, setFilters] = useState<ListFilterState>(emptyListFilters);
-  const [isSelectingItems, setIsSelectingItems] = useState(false);
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
-  const categoryOptions = useMemo(
-    () => getUniqueValues(items.map((item) => item.category)),
-    [items],
-  );
+  useEffect(() => subscribeShoppingList(setItems), []);
 
-  const displayItems = useMemo(() => {
-    const filtered = filterShoppingItems(items, filters);
-    return sortShoppingItems(filtered, sortField, sortDirection);
-  }, [items, filters, sortField, sortDirection]);
-
-  const selectedCategoryMonthlyTotal = useMemo(() => {
-    if (!filters.category) {
-      return null;
-    }
-
-    return items
-      .filter((item) => item.category === filters.category)
-      .reduce((total, item) => total + Number(item.quantity || 0) * Number(item.price || 0), 0);
-  }, [filters.category, items]);
-
-  const selectedItems = useMemo(
-    () => items.filter((item) => selectedItemIds.has(item.id)),
-    [items, selectedItemIds],
-  );
-
-  const selectedItemsTotal = useMemo(
-    () => selectedItems.reduce((total, item) => total + item.quantity * item.price, 0),
-    [selectedItems],
-  );
-
-  const toggleItemSelection = (id: string) => {
-    setSelectedItemIds((current) => {
-      const next = new Set(current);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectionMode = () => {
-    setIsSelectingItems((active) => !active);
-    setSelectedItemIds(new Set());
-  };
-
-  useEffect(() => {
-    setVisibleCount(6);
-  }, [filters, sortField, sortDirection]);
-
-  const getScaleAnimation = useCallback((categoryId: string) => {
-    if (!scaleAnimationsRef.current[categoryId]) {
-      scaleAnimationsRef.current[categoryId] = new Animated.Value(1);
-    }
-    return scaleAnimationsRef.current[categoryId];
-  }, []);
-
-  const handleCategoryPressIn = useCallback((categoryId: string) => {
-    Animated.spring(getScaleAnimation(categoryId), {
-      toValue: 0.96,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 90,
-    }).start();
-  }, [getScaleAnimation]);
-
-  const handleCategoryPressOut = useCallback((categoryId: string) => {
-    Animated.spring(getScaleAnimation(categoryId), {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 10,
-      tension: 100,
-    }).start();
-  }, [getScaleAnimation]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeShoppingList((nextItems) => setItems(nextItems));
-    return unsubscribe;
-  }, []);
-
-  const handleAddItem = () => {
-    const trimmedName = name.trim() || selectedCategory.label;
-    const normalizedPrice = Number(price);
-
-    if (!trimmedName) {
-      return;
-    }
-
+  const addToList = () => {
+    const itemName = name.trim() || category.label;
+    if (!itemName) return;
     addShoppingListItem({
       id: `${Date.now()}`,
-      name: trimmedName,
-      category: selectedCategory.label,
+      name: itemName,
+      category: category.label,
       quantity: Number(quantity) || 1,
-      price: Number.isNaN(normalizedPrice) ? 0 : normalizedPrice,
-      purchasedDate: getDateKey(),
+      purchasedDate: getDateKey(), price: 0, planned: true,
     });
-
     setName("");
     setQuantity("1");
-    setPrice("");
-    setIsFormOpen(false);
+    setIsAddModalVisible(false);
   };
 
-  const handleToggleForm = () => setIsFormOpen((prev) => !prev);
-
-  const handleSelectCategory = (category: Category) => {
-    setSelectedCategory(category);
-    setCategoryModalVisible(true);
+  const openBought = (item: ShoppingListItem) => {
+    setBoughtItem(item);
+    setBoughtQuantity(String(item.quantity));
+    setUnitCost("");
   };
 
-  const handleCloseModal = () => setCategoryModalVisible(false);
-
-  const handleAddCustomCategory = () => {
-    const label = newCategoryName.trim();
-    if (!label) {
-      return;
-    }
-
-    const customCategory: Category = {
-      id: `${Date.now()}`,
-      label,
-      icon: "pricetag-outline",
-      color: "#8b5cf6",
-    };
-
-    setCategories((currentCategories) =>
-      [...currentCategories, customCategory].sort((a, b) => a.label.localeCompare(b.label)),
-    );
-    setSelectedCategory(customCategory);
-    setNewCategoryName("");
+  const confirmBought = () => {
+    if (!boughtItem) return;
+    const count = Number(boughtQuantity);
+    const cost = Number(unitCost);
+    if (!count || Number.isNaN(cost) || cost < 0) return;
+    markShoppingListItemBought(boughtItem.id, count, cost);
+    setBoughtItem(null);
   };
 
-  const handleStartEdit = (item: { id: string; name: string; price: number }) => {
-    setEditingId(item.id);
-    setEditingName(item.name);
-    setEditingPrice(String(item.price));
-  };
-
-  const handleSaveEdit = (id: string) => {
-    const normalizedPrice = Number(editingPrice);
-    if (!editingName.trim() || Number.isNaN(normalizedPrice)) {
-      return;
-    }
-
-    updateShoppingListItem(id, {
-      name: editingName,
-      price: normalizedPrice,
-    });
-
-    setEditingId(null);
-    setEditingName("");
-    setEditingPrice("");
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditingName("");
-    setEditingPrice("");
-  };
-
-  const handleActionsEdit = () => {
-    if (!actionsItemId) return;
-    const item = items.find((i) => i.id === actionsItemId);
-    if (!item) return;
-
-    handleStartEdit({ id: item.id, name: item.name, price: item.price });
-    setActionsModalVisible(false);
+  const closeActions = () => {
+    setActionsVisible(false);
     setActionsItemId(null);
   };
 
-  const handleActionsDelete = () => {
-    if (!actionsItemId) return;
-    deleteShoppingListItem(actionsItemId);
-    setActionsModalVisible(false);
-    setActionsItemId(null);
+  const editSelectedItem = () => {
+    const item = items.find((entry) => entry.id === actionsItemId);
+    if (item) {
+      setEditingItemId(item.id);
+      setEditingName(item.name);
+    }
+    closeActions();
+  };
+
+  const deleteSelectedItem = () => {
+    if (actionsItemId) deleteShoppingListItem(actionsItemId);
+    closeActions();
+  };
+
+  const saveItemName = (id: string) => {
+    if (!editingName.trim()) return;
+    updateShoppingListItem(id, { name: editingName });
+    setEditingItemId(null);
+    setEditingName("");
   };
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.screenContent}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-      >
-        <ThemedText style={styles.title}></ThemedText>
-
-        <ThemedView style={styles.heroCard}>
-          <ThemedText style={styles.heroTitle}>Quick, clean shopping tracking</ThemedText>
-          <ThemedText style={styles.heroSubtitle}>
-            Tap to add your item
-          </ThemedText>
-
-          <Pressable style={styles.heroAction} onPress={handleToggleForm}>
-            <Ionicons name={isFormOpen ? "close-circle" : "add-circle"} size={22} color="white" />
-            <ThemedText style={styles.heroActionText}>
-              {isFormOpen ? "Hide categories" : "Add new item"}
-            </ThemedText>
-          </Pressable>
+      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}>
+        <ThemedText style={styles.title}>Shopping list</ThemedText>
+        <ThemedText style={styles.subtitle}>Keep your market checklist here. Mark an item bought to add it to Expense.</ThemedText>
+        <ThemedView style={styles.formCard}>
+          <ThemedText style={styles.sectionTitle}>Choose a category</ThemedText>
+          <View style={styles.categoryGrid}>
+            {purchaseCategories.map((option) => <Pressable key={option.id} onPress={() => { setCategory(option); setIsAddModalVisible(true); }} style={styles.category}>
+              <View style={[styles.categoryIcon, { backgroundColor: option.color }]}><Ionicons name={option.icon as any} size={18} color="white" /></View>
+              <ThemedText style={styles.categoryLabel}>{option.label}</ThemedText>
+            </Pressable>)}
+          </View>
         </ThemedView>
 
-        {isFormOpen ? (
-          <ThemedView style={styles.formCard}>
-            <ThemedText style={styles.sectionTitle}>Pick a category</ThemedText>
-            <ThemedView style={styles.categoryGrid}>
-              {categories.map((categoryItem) => {
-                const animatedScale = getScaleAnimation(categoryItem.id);
-                return (
-                  <Pressable
-                    key={categoryItem.id}
-                    style={[
-                      styles.categoryCell,
-                      selectedCategory.id === categoryItem.id && styles.categoryCellActive,
-                    ]}
-                    onPress={() => handleSelectCategory(categoryItem)}
-                    onPressIn={() => handleCategoryPressIn(categoryItem.id)}
-                    onPressOut={() => handleCategoryPressOut(categoryItem.id)}
-                  >
-                    <Animated.View style={[styles.animatedCategory, { transform: [{ scale: animatedScale }] }]}> 
-                      <ThemedView style={[styles.categoryIcon, { backgroundColor: categoryItem.color }]}> 
-                        <Ionicons name={categoryItem.icon as any} size={18} color="white" />
-                      </ThemedView>
-                      <ThemedText
-                        style={
-                          selectedCategory.id === categoryItem.id
-                            ? styles.categoryLabelActive
-                            : styles.categoryLabel
-                        }
-                      >
-                        {categoryItem.label}
-                      </ThemedText>
-                    </Animated.View>
-                  </Pressable>
-                );
-              })}
-            </ThemedView>
-
-            <ThemedText style={styles.helpText}>Tap a category to add item details in a smooth pop-up.</ThemedText>
-
-            <Modal
-              visible={categoryModalVisible}
-              animationType="slide"
-              transparent
-              onRequestClose={handleCloseModal}
-            >
-              <View style={styles.modalBackdrop}>
-                <View style={styles.modalCard}>
-                  <View style={styles.modalHeader}>
-                    <ThemedText style={styles.modalTitle}>Add to {selectedCategory.label}</ThemedText>
-                    <Pressable onPress={handleCloseModal} style={styles.modalCloseButton}>
-                      <Ionicons name="close" size={22} color="#94a3b8" />
-                    </Pressable>
-                  </View>
-
-                  <ThemedView style={styles.selectedBadge}>
-                    <Ionicons name={selectedCategory.icon as any} size={16} color="white" />
-                    <ThemedText style={styles.selectedBadgeText}>{selectedCategory.label}</ThemedText>
-                  </ThemedView>
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Item name"
-                    placeholderTextColor="#8b95a6"
-                    value={name}
-                    onChangeText={setName}
-                  />
-
-                  <ThemedView style={styles.rowInputs}>
-                    <TextInput
-                      style={[styles.input, styles.halfInput]}
-                      placeholder="Qty"
-                      placeholderTextColor="#8b95a6"
-                      value={quantity}
-                      onChangeText={setQuantity}
-                      keyboardType="number-pad"
-                    />
-                    <TextInput
-                      style={[styles.input, styles.halfInput]}
-                      placeholder="Price"
-                      placeholderTextColor="#8b95a6"
-                      value={price}
-                      onChangeText={setPrice}
-                      keyboardType="decimal-pad"
-                    />
-                  </ThemedView>
-
-                  <Pressable style={styles.submitButton} onPress={handleAddItem}>
-                    <ThemedText style={styles.submitButtonText}>Add Item</ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            </Modal>
-          </ThemedView>
-        ) : null}
-
-        <ThemedView style={styles.listSection}>
-          <ThemedText style={styles.sectionTitle}>Your current list</ThemedText>
-          {items.length > 0 ? (
-            <>
-              <ListSearchBar
-                filters={filters}
-                onFiltersChange={setFilters}
-                categories={categoryOptions}
-                placeholder="Search items, categories, dates..."
-              />
-              <ListSortBar
-                fields={[
-                  { key: "date", label: "Date" },
-                  { key: "name", label: "Name" },
-                  { key: "cost", label: "Cost" },
-                  { key: "category", label: "Category" },
-                  { key: "quantity", label: "Qty" },
-                ]}
-                sortField={sortField}
-                sortDirection={sortDirection}
-                onSortChange={(field, direction) => {
-                  setSortField(field);
-                  setSortDirection(direction);
-                }}
-              />
-              {selectedCategoryMonthlyTotal !== null ? (
-                <ThemedView style={styles.categoryTotalCard}>
-                  <ThemedText style={styles.categoryTotalLabel}>
-                    {filters.category} spent this month
-                  </ThemedText>
-                  <ThemedText style={styles.categoryTotalAmount}>
-                    ₹{selectedCategoryMonthlyTotal.toFixed(2)}
-                  </ThemedText>
-                </ThemedView>
-              ) : null}
-              <SelectionTotalBar
-                active={isSelectingItems}
-                count={selectedItems.length}
-                total={selectedItemsTotal}
-                onToggle={toggleSelectionMode}
-                onClear={() => setSelectedItemIds(new Set())}
-              />
-            </>
-          ) : null}
-          {items.length === 0 ? (
-            <ThemedView style={styles.emptyCard}>
-              <ThemedText style={styles.emptyText}>No items yet. Tap "Add new item" to get started.</ThemedText>
-            </ThemedView>
-          ) : displayItems.length === 0 ? (
-            <ThemedView style={styles.emptyCard}>
-              <ThemedText style={styles.emptyText}>
-                {isFilterActive(filters) ? "No items match your search or filters." : "No items to show."}
-              </ThemedText>
-            </ThemedView>
-          ) : (
-          <ScrollView contentContainerStyle={styles.listContent}>
-            {(displayItems.slice(0, visibleCount)).map((item) => (
-              <Pressable
-                key={item.id}
-                style={[styles.listCard, isSelectingItems && selectedItemIds.has(item.id) && styles.listCardSelected]}
-                onPress={isSelectingItems ? () => toggleItemSelection(item.id) : undefined}
-                onLongPress={isSelectingItems ? undefined : () => {
-                  setActionsItemId(item.id);
-                  setActionsModalVisible(true);
-                }}
-              >
-                {editingId === item.id ? (
-                  <ThemedView style={styles.editContainer}>
-                    <TextInput
-                      style={styles.editInput}
-                      placeholder="Name"
-                      placeholderTextColor="#8b95a6"
-                      value={editingName}
-                      onChangeText={setEditingName}
-                    />
-                    <TextInput
-                      style={styles.editInput}
-                      placeholder="Price"
-                      placeholderTextColor="#8b95a6"
-                      value={editingPrice}
-                      onChangeText={setEditingPrice}
-                      keyboardType="decimal-pad"
-                    />
-                    <ThemedView style={styles.editActions}>
-                      <Pressable style={styles.saveButton} onPress={() => handleSaveEdit(item.id)}>
-                        <ThemedText style={styles.saveButtonText}>Save</ThemedText>
-                      </Pressable>
-                      <Pressable style={styles.cancelButton} onPress={handleCancelEdit}>
-                        <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-                      </Pressable>
-                    </ThemedView>
-                  </ThemedView>
-                ) : (
-                  <ThemedView style={styles.cardRow}>
-                    {isSelectingItems ? (
-                      <View style={[styles.selectionIndicator, selectedItemIds.has(item.id) && styles.selectionIndicatorActive]}>
-                        {selectedItemIds.has(item.id) ? <Ionicons name="checkmark" size={15} color="white" /> : null}
-                      </View>
-                    ) : null}
-                    <ThemedView style={styles.cardInfo}>
-                      <ThemedView style={styles.listHeaderRow}>
-                        <ThemedText style={styles.listName}>{item.name}</ThemedText>
-                      </ThemedView>
-<ThemedText style={styles.listMeta}>{item.category}</ThemedText>
-                      {/* <ThemedText style={styles.listMeta}>Price: ${item.price.toFixed(2)} each</ThemedText> */}
-                      <ThemedText style={styles.listMeta}>Total: ₹{(item.quantity * item.price).toFixed(2)}</ThemedText>
-                      <ThemedText style={styles.listMeta}>Qty: {item.quantity}</ThemedText>
-                      <ThemedText style={styles.listMeta}>Purchased: {item.purchasedDate}</ThemedText>
-                    </ThemedView>
-
-                    <ThemedView style={styles.quantityControls}>
-                      <Pressable style={styles.qtyButton} onPress={() => updateShoppingListQuantity(item.id, -1)}>
-                        <ThemedText style={styles.qtyButtonText}>-</ThemedText>
-                      </Pressable>
-                      <ThemedText style={styles.qtyValue}>{item.quantity}</ThemedText>
-                      <Pressable style={styles.qtyButton} onPress={() => updateShoppingListQuantity(item.id, 1)}>
-                        <ThemedText style={styles.qtyButtonText}>+</ThemedText>
-                      </Pressable>
-                    </ThemedView>
-                  </ThemedView>
-                )}
-              </Pressable>
-            ))}
-            {displayItems.length > 6 ? (
-              <Pressable
-                style={styles.showMoreButton}
-                onPress={() => {
-                  if (visibleCount >= displayItems.length) {
-                    setVisibleCount(6);
-                  } else {
-                    const remaining = displayItems.length - visibleCount;
-                    setVisibleCount((c) => c + Math.min(5, remaining));
-                  }
-                }}
-              >
-                <ThemedText style={styles.showMoreText}>
-                  {visibleCount >= displayItems.length ? "Show less" : `Show ${Math.min(5, displayItems.length - visibleCount)} more`}
-                </ThemedText>
-              </Pressable>
-            ) : null}
-          </ScrollView>
-          )}
-        </ThemedView>
-        <ItemActions
-          visible={actionsModalVisible}
-          onClose={() => setActionsModalVisible(false)}
-          onEdit={handleActionsEdit}
-          onDelete={handleActionsDelete}
-        />
+        <ThemedText style={styles.sectionTitle}>To buy ({items.length})</ThemedText>
+        {items.length === 0 ? <ThemedView style={styles.empty}><ThemedText style={styles.muted}>Your list is clear. Add something before your next trip.</ThemedText></ThemedView> : items.map((item) => <Pressable key={item.id} style={styles.itemCard} onLongPress={() => { setActionsItemId(item.id); setActionsVisible(true); }}>
+          <View style={styles.itemTop}><View style={styles.itemDetails}>{editingItemId === item.id ? <TextInput autoFocus style={styles.editInput} value={editingName} onChangeText={setEditingName} onSubmitEditing={() => saveItemName(item.id)} returnKeyType="done" /> : <ThemedText style={styles.itemName}>{item.name}</ThemedText>}<ThemedText style={styles.muted}>{item.category} - Need {item.quantity}</ThemedText></View>
+            {editingItemId === item.id ? <View style={styles.editControls}><Pressable onPress={() => saveItemName(item.id)} hitSlop={8}><Ionicons name="checkmark" size={21} color="#22c55e" /></Pressable><Pressable onPress={() => { setEditingItemId(null); setEditingName(""); }} hitSlop={8}><Ionicons name="close" size={21} color="#94a3b8" /></Pressable></View> : null}</View>
+          <View style={styles.itemActions}><View style={styles.counter}><Pressable onPress={() => updateShoppingListQuantity(item.id, -1)}><Ionicons name="remove" size={18} color="white" /></Pressable><ThemedText style={styles.count}>{item.quantity}</ThemedText><Pressable onPress={() => updateShoppingListQuantity(item.id, 1)}><Ionicons name="add" size={18} color="white" /></Pressable></View>
+            <Pressable style={styles.boughtButton} onPress={() => openBought(item)}><Ionicons name="checkmark-circle" size={18} color="white" /><ThemedText style={styles.boughtText}>Buy</ThemedText></Pressable></View>
+        </Pressable>)}
       </ScrollView>
+
+      <ItemActions visible={actionsVisible} onClose={closeActions} onEdit={editSelectedItem} onDelete={deleteSelectedItem} title={items.find((item) => item.id === actionsItemId)?.name} />
+
+      <Modal transparent animationType="slide" visible={isAddModalVisible} onRequestClose={() => setIsAddModalVisible(false)}><View style={styles.backdrop}><View style={styles.modal}>
+        <View style={styles.modalHeader}><ThemedText style={styles.modalTitle}>Add to list</ThemedText><Pressable onPress={() => setIsAddModalVisible(false)}><Ionicons name="close" size={24} color="#94a3b8" /></Pressable></View>
+        <View style={styles.selectedCategory}><View style={[styles.categoryIcon, { backgroundColor: category.color }]}><Ionicons name={category.icon as any} size={18} color="white" /></View><ThemedText style={styles.itemName}>{category.label}</ThemedText></View>
+        <TextInput style={styles.input} placeholder="Item name (optional)" placeholderTextColor="#94a3b8" value={name} onChangeText={setName} />
+        <TextInput style={styles.input} placeholder="How many?" placeholderTextColor="#94a3b8" keyboardType="number-pad" value={quantity} onChangeText={setQuantity} />
+        <Pressable style={styles.primaryButton} onPress={addToList}><ThemedText style={styles.primaryButtonText}>Add to list</ThemedText></Pressable>
+      </View></View></Modal>
+
+      <Modal transparent animationType="slide" visible={!!boughtItem} onRequestClose={() => setBoughtItem(null)}><View style={styles.backdrop}><View style={styles.modal}>
+        <View style={styles.modalHeader}><ThemedText style={styles.modalTitle}>Mark as bought</ThemedText><Pressable onPress={() => setBoughtItem(null)}><Ionicons name="close" size={24} color="#94a3b8" /></Pressable></View>
+        <ThemedText style={styles.muted}>{boughtItem?.name} will be added to your expense list.</ThemedText>
+        <TextInput style={styles.input} placeholder="Count" placeholderTextColor="#94a3b8" keyboardType="number-pad" value={boughtQuantity} onChangeText={setBoughtQuantity} />
+        <TextInput style={styles.input} placeholder="Cost per item (₹)" placeholderTextColor="#94a3b8" keyboardType="decimal-pad" value={unitCost} onChangeText={setUnitCost} />
+        <Pressable style={styles.primaryButton} onPress={confirmBought}><ThemedText style={styles.primaryButtonText}>Add to expenses</ThemedText></Pressable>
+      </View></View></Modal>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 18,
-  },
-  screenContent: {
-    paddingBottom: 32,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    marginBottom: 16,
-  },
-  heroCard: {
-    borderRadius: 24,
-    padding: 20,
-    backgroundColor: "#154cc2",
-    marginBottom: 18,
-  },
-  heroTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 8,
-    color: "white",
-  },
-  heroSubtitle: {
-    color: "#cbd5e1",
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  heroAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#000000",
-    paddingVertical: 12,
-    borderRadius: 16,
-  },
-  heroActionText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  formCard: {
-    marginBottom: 18,
-    padding: 18,
-    borderRadius: 24,
-    backgroundColor: "#171717",
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 18,
-    padding: 6,
-  },
-  categoryCell: {
-    width: "31%",
-    minHeight: 78,
-    borderRadius: 18,
-    backgroundColor: "#171717",
-    padding: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  categoryCellActive: {
-    backgroundColor: "#0844f7",
-  },
-  categoryIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  categoryLabel: {
-    color: "#cbd5e1",
-    textAlign: "center",
-    fontSize: 12,
-  },
-  categoryLabelActive: {
-    color: "white",
-    textAlign: "center",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  animatedCategory: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  selectedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  selectedBadgeText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  helpText: {
-    color: "#94a3b8",
-    marginBottom: 14,
-    fontSize: 13,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(6, 5, 5, 0.55)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: "#171717",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 22,
-    paddingBottom: 30,
-    borderColor: "#1e293b",
-    borderWidth: 1,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 18,
-  },
-  modalTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  modalCloseButton: {
-    padding: 8,
-  },
-  input: {
-    backgroundColor: "#111827",
-    borderRadius: 16,
-    color: "white",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  rowInputs: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-  },
-  halfInput: {
-    flex: 1,
-  },
-  submitButton: {
-    marginTop: 8,
-    backgroundColor: "#2563eb",
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  submitButtonText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  newCategoryRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
-  newCategoryInput: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  newCategoryButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: "#2563eb",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  listSection: {
-    marginBottom: 24,
-  },
-  categoryTotalCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginTop: 12,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: "#102a43",
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-  },
-  categoryTotalLabel: {
-    flex: 1,
-    color: "#dbeafe",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  categoryTotalAmount: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-  },
-  emptyCard: {
-    borderRadius: 22,
-    padding: 18,
-    backgroundColor: "#111827",
-  },
-  emptyText: {
-    color: "#94a3b8",
-  },
-  listContent: {
-    gap: 14,
-  },
-  listCard: {
-    borderRadius: 24,
-    backgroundColor: "#171717",
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#1f2937",
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  listCardSelected: {
-    borderColor: "#3b82f6",
-    backgroundColor: "#102a43",
-  },
-  selectionIndicator: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#64748b",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  selectionIndicatorActive: {
-    backgroundColor: "#2563eb",
-    borderColor: "#2563eb",
-  },
-  cardRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-    backgroundColor: "#171717",
-  },
-  cardInfo: {
-    flex: 1,
-    backgroundColor: "#171717"
-  },
-  listHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 6,
-    backgroundColor: "#171717"
-  },
-  listName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "white",
-  },
-  listMeta: {
-    color: "#94a3b8",
-    marginTop: 2,
-    fontSize: 13,
-  },
-  quantityControls: {
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderRadius: 18,
-    padding: 8,
-    width: 96,
-    backgroundColor: "#171717",
-  },
-  qtyButton: {
-    width: 30,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-    backgroundColor: "#171717",
-  },
-  qtyButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  qtyValue: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-    marginVertical: 4,
-  },
-  editContainer: {
-    gap: 12,
-  },
-  editInput: {
-    backgroundColor: "#111827",
-    borderRadius: 16,
-    color: "white",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  editActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: "#16a34a",
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  saveButtonText: {
-    color: "white",
-    fontWeight: "700",
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: "#334155",
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  cancelButtonText: {
-    color: "#cbd5e1",
-    fontWeight: "700",
-  },
-  showMoreButton: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  showMoreText: {
-    color: "#2563eb",
-    fontWeight: "700",
-  },
+  selectedCategory: { flexDirection: "row", alignItems: "center", gap: 10 },
+  editInput: { color: "white", backgroundColor: "#111827", borderColor: "#334155", borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  editControls: { flexDirection: "row", alignItems: "center", gap: 12 },
+  container: { flex: 1, padding: 18 }, content: { paddingTop: 32, paddingBottom: 88, gap: 14 }, title: { fontSize: 30, fontWeight: "800", height:40 }, subtitle: { color: "#94a3b8", lineHeight: 21, marginBottom: 4, marginTop: 2 }, hero: { backgroundColor: "#154cc2", borderRadius: 24, padding: 20, gap: 10 }, heroTitle: { color: "white", fontSize: 20, fontWeight: "800" }, heroText: { color: "#dbeafe", lineHeight: 20 }, primaryButton: { backgroundColor: "#2563eb", borderRadius: 14, paddingVertical: 13, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }, primaryButtonText: { color: "white", fontWeight: "800" }, formCard: { backgroundColor: "#171717", borderRadius: 22, padding: 16, gap: 12 }, sectionTitle: { fontSize: 18, fontWeight: "800", marginTop: 6 }, categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, category: { width: "31%", minHeight: 72, borderRadius: 14, padding: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#0f172a", gap: 5 }, categorySelected: { borderWidth: 2, borderColor: "#2563eb" }, categoryIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" }, categoryLabel: { color: "white", fontSize: 11, textAlign: "center" }, input: { color: "white", backgroundColor: "#111827", borderColor: "#334155", borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }, empty: { backgroundColor: "#111827", borderRadius: 18, padding: 18 }, muted: { color: "#94a3b8" }, itemCard: { backgroundColor: "#111827", borderRadius: 18, padding: 16, gap: 14 }, itemTop: { flexDirection: "row", justifyContent: "space-between", gap: 12 }, itemDetails: { flex: 1, gap: 4 }, itemName: { color: "white", fontSize: 17, fontWeight: "800" }, itemActions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, counter: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: "#0f172a", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }, count: { color: "white", fontWeight: "800", minWidth: 20, textAlign: "center" }, boughtButton: { flexDirection: "row", gap: 6, alignItems: "center", backgroundColor: "#2563eb", paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12 }, boughtText: { color: "white", fontWeight: "800" }, backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }, modal: { backgroundColor: "#171717", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, gap: 14 }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, modalTitle: { color: "white", fontSize: 21, fontWeight: "800" },
 });

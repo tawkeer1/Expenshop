@@ -1,777 +1,86 @@
-import ItemActions from "@/components/item-actions";
-import ListSearchBar from "@/components/list-search-bar";
-import ListSortBar from "@/components/list-sort-bar";
-import SelectionTotalBar from "@/components/selection-total-bar";
-import { router } from "expo-router";
+﻿import Ionicons from "@expo/vector-icons/build/Ionicons";
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
-import {
-    addExpenseItem,
-    deleteExpenseItem,
-    getDateKey,
-    getExpenseItems,
-    getExpenseSummary,
-    getShoppingListItems,
-    subscribeShoppingList,
-    updateExpenseItem,
-} from "@/app/models/shoppinglist";
+import { addExpenseItem, deleteExpenseItem, getDateKey, getExpenseItems, getExpenseSummary, subscribeShoppingList, updateExpenseItem, type ExpenseItem } from "@/app/models/shoppinglist";
+import { purchaseCategories } from "@/app/models/purchase-categories";
+import ItemActions from "@/components/item-actions";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import {
-    emptyListFilters,
-    filterExpenseEntries,
-    getUniqueValues,
-    isFilterActive,
-    type ListFilterState,
-} from "@/utils/list-filter";
-import {
-    sortExpenseEntries,
-    type ExpenseEntry,
-    type ExpenseSortField,
-    type SortDirection,
-} from "@/utils/list-sort";
-import Ionicons from "@expo/vector-icons/build/Ionicons";
 
-const expenseCategories = [
-  { label: "Electricity", icon: "flash-outline", color: "#f59e0b" },
-  { label: "Entertainment", icon: "game-controller-outline", color: "#8b5cf6" },
-  { label: "Grooming", icon: "person-outline", color: "#ec4899" },
-  { label: "Gym", icon: "fitness-outline", color: "#14b8a6" },
-  { label: "Health", icon: "medkit-outline", color: "#ef4444" },
-  { label: "Internet", icon: "wifi-outline", color: "#3b82f6" },
-  { label: "Office", icon: "briefcase-outline", color: "#22c55e" },
-  { label: "Petrol", icon: "car-outline", color: "#f97316" },
-  { label: "Rent", icon: "home-outline", color: "#6366f1" },
-  { label: "Subscriptions", icon: "card-outline", color: "#a855f7" },
-  { label: "Transport", icon: "bus-outline", color: "#0ea5e9" },
-  { label: "Water", icon: "water-outline", color: "#38bdf8" },
-  { label: "Zomato/Swiggy", icon: "fast-food-outline", color: "#fb7185" },
-] as const;
-
-type ExpenseCategory = (typeof expenseCategories)[number];
+const monthlyCategories = [
+  { label: "Rent", icon: "home-outline", color: "#6366f1" }, { label: "Electricity", icon: "flash-outline", color: "#f59e0b" },
+  { label: "Water", icon: "water-outline", color: "#38bdf8" }, { label: "Internet", icon: "wifi-outline", color: "#3b82f6" },
+  { label: "Transport", icon: "bus-outline", color: "#0ea5e9" }, { label: "Subscriptions", icon: "card-outline", color: "#a855f7" },
+  { label: "Health", icon: "medkit-outline", color: "#ef4444" }, { label: "Other", icon: "pricetag-outline", color: "#64748b" },
+];
+type Mode = "monthly" | "buy";
+type SelectedCategory = { label: string; icon: string; color: string };
 
 export default function ExpenseScreen() {
-  const [summary, setSummary] = useState(() => getExpenseSummary());
-  const [shoppingItems, setShoppingItems] = useState(() => getShoppingListItems());
-  const [manualExpenses, setManualExpenses] = useState(() => getExpenseItems());
-  const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>(expenseCategories[0]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [summary, setSummary] = useState(getExpenseSummary());
+  const [expenses, setExpenses] = useState<ExpenseItem[]>(getExpenseItems());
+  const [mode, setMode] = useState<Mode>("monthly");
+  const [selected, setSelected] = useState<SelectedCategory>(monthlyCategories[0]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
+  const [count, setCount] = useState("1");
   const [editId, setEditId] = useState<string | null>(null);
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(6);
-  const [sortField, setSortField] = useState<ExpenseSortField>("date");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [filters, setFilters] = useState<ListFilterState>(emptyListFilters);
-  const [isSelectingItems, setIsSelectingItems] = useState(false);
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
 
-  useEffect(() => {
-    setVisibleCount(6);
-  }, [filters, sortField, sortDirection]);
-
-  useEffect(() => {
-    setShoppingItems(getShoppingListItems());
-    setManualExpenses(getExpenseItems());
-    setSummary(getExpenseSummary());
-
-    const unsubscribe = subscribeShoppingList(() => {
-      setShoppingItems(getShoppingListItems());
-      setManualExpenses(getExpenseItems());
-      setSummary(getExpenseSummary());
-    });
-
-    return unsubscribe;
-  }, []);
-
-  const expenseEntries = useMemo<ExpenseEntry[]>(
-    () => [
-      ...manualExpenses.map((expense) => ({
-        id: expense.id,
-        category: expense.category,
-        label: expense.description || expense.category,
-        amount: expense.amount,
-        date: expense.purchasedDate,
-        source: "Expense",
-      })),
-      ...shoppingItems.map((item) => ({
-        id: item.id,
-        category: item.category,
-        label: item.name,
-        amount: item.quantity * item.price,
-        date: item.purchasedDate,
-        source: "Shopping",
-      })),
-    ],
-    [manualExpenses, shoppingItems],
-  );
-
-  const categoryOptions = useMemo(
-    () => getUniqueValues(expenseEntries.map((entry) => entry.category)),
-    [expenseEntries],
-  );
-
-  const allExpenses = useMemo(() => {
-    const filtered = filterExpenseEntries(expenseEntries, filters);
-    return sortExpenseEntries(filtered, sortField, sortDirection);
-  }, [expenseEntries, filters, sortField, sortDirection]);
-
-  const selectedCategoryMonthlyTotal = useMemo(() => {
-    if (!filters.category) {
-      return null;
-    }
-
-    const currentMonth = getDateKey().slice(0, 7);
-    return expenseEntries
-      .filter((entry) => entry.category === filters.category && entry.date.startsWith(currentMonth))
-      .reduce((total, entry) => total + Number(entry.amount || 0), 0);
-  }, [expenseEntries, filters.category]);
-
-  const selectedEntries = useMemo(
-    () => expenseEntries.filter((entry) => selectedItemIds.has(entry.id)),
-    [expenseEntries, selectedItemIds],
-  );
-
-  const selectedItemsTotal = useMemo(
-    () => selectedEntries.reduce((total, entry) => total + entry.amount, 0),
-    [selectedEntries],
-  );
-
-  const toggleItemSelection = (id: string) => {
-    setSelectedItemIds((current) => {
-      const next = new Set(current);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  useEffect(() => subscribeShoppingList(() => { setExpenses(getExpenseItems()); setSummary(getExpenseSummary()); }), []);
+  const currentMonth = getDateKey().slice(0, 7);
+  const monthExpenses = useMemo(() => expenses.filter((item) => item.purchasedDate.startsWith(currentMonth)), [expenses, currentMonth]);
+  const openAdd = (category: SelectedCategory) => { setEditId(null); setSelected(category); setName(""); setAmount(""); setCount("1"); setModalOpen(true); };
+  const openEdit = (expense: ExpenseItem) => {
+    const isBuy = expense.source === "Buy item" || expense.quantity !== undefined || expense.unitPrice !== undefined;
+    const categories: SelectedCategory[] = isBuy ? purchaseCategories : monthlyCategories;
+    setMode(isBuy ? "buy" : "monthly");
+    setEditId(expense.id);
+    setSelected(categories.find((option) => option.label === expense.category) ?? categories[0]);
+    setName(expense.description);
+    setCount(String(expense.quantity ?? 1));
+    setAmount(String(isBuy ? expense.unitPrice ?? expense.amount / (expense.quantity || 1) : expense.amount));
+    setModalOpen(true);
   };
-
-  const toggleSelectionMode = () => {
-    setIsSelectingItems((active) => !active);
-    setSelectedItemIds(new Set());
-  };
-
-  const handleToggleForm = () => setIsFormOpen((prev) => !prev);
-
-  const handleOpenCategory = (category: typeof expenseCategories[number]) => {
-    setSelectedCategory(category);
-    setAmount("");
-    setDescription("");
-    setModalVisible(true);
-  };
-
-  const handleAddExpense = () => {
-    const value = Number(amount);
-    if (!value || Number.isNaN(value)) {
-      return;
-    }
-
+  const save = () => {
+    const value = Number(amount); const quantity = Number(count) || 1;
+    if (!value || Number.isNaN(value)) return;
+    const isBuy = mode === "buy";
+    const updates = { category: selected.label, description: name.trim() || selected.label, amount: isBuy ? value * quantity : value, quantity: isBuy ? quantity : undefined, unitPrice: isBuy ? value : undefined, source: isBuy ? "Buy item" as const : "Monthly expense" as const };
     if (editId) {
-      updateExpenseItem(editId, {
-        category: selectedCategory.label,
-        amount: value,
-        description: description.trim() || selectedCategory.label,
-      });
+      updateExpenseItem(editId, updates);
       setEditId(null);
     } else {
-      addExpenseItem({
-        id: `${Date.now()}`,
-        category: selectedCategory.label,
-        amount: value,
-        description: description.trim() || selectedCategory.label,
-        purchasedDate: getDateKey(),
-      });
+      addExpenseItem({ id: `${Date.now()}`, ...updates, purchasedDate: getDateKey() });
     }
-
-    setModalVisible(false);
+    setModalOpen(false);
   };
-
-  const handleEditExpense = (id: string) => {
-    const item = getExpenseItems().find((e) => e.id === id);
-    if (!item) return;
-
-    setEditId(item.id);
-    setAmount(String(item.amount));
-    setDescription(item.description || item.category || "");
-    const matchingCategory = expenseCategories.find((c) => c.label === item.category);
-    setSelectedCategory(matchingCategory ?? expenseCategories[0]);
-    setModalVisible(true);
+  const closeActions = () => { setActionsVisible(false); setSelectedActionId(null); };
+  const editSelectedExpense = () => {
+    const expense = expenses.find((item) => item.id === selectedActionId);
+    closeActions();
+    if (expense) openEdit(expense);
   };
-
-  const handleDeleteExpense = (id: string) => {
-    deleteExpenseItem(id);
+  const deleteSelectedExpense = () => {
+    if (selectedActionId) deleteExpenseItem(selectedActionId);
+    closeActions();
   };
+  const categories: SelectedCategory[] = mode === "monthly" ? monthlyCategories : purchaseCategories;
 
-  const handleOpenActions = (id: string) => {
-    setSelectedEntryId(id);
-    setActionsVisible(true);
-  };
-
-  const handleCloseActions = () => {
-    setSelectedEntryId(null);
-    setActionsVisible(false);
-  };
-
-  const handleActionsEdit = () => {
-    if (!selectedEntryId) return;
-    const entry = allExpenses.find((e) => e.id === selectedEntryId);
-    if (!entry) return;
-
-    if (entry.source === "Expense") {
-      handleEditExpense(selectedEntryId);
-    } else {
-      router.push("/shopping-list");
-    }
-  };
-
-  const handleActionsDelete = () => {
-    if (!selectedEntryId) return;
-    const entry = allExpenses.find((e) => e.id === selectedEntryId);
-    if (!entry) return;
-
-    if (entry.source === "Expense") {
-      deleteExpenseItem(selectedEntryId);
-    } else {
-      // delete shopping item
-      // import and call deleteShoppingListItem
-      // lazy import to avoid circular issues
-      const { deleteShoppingListItem } = require("@/app/models/shoppinglist");
-      deleteShoppingListItem(selectedEntryId);
-    }
-  };
-
-  return (
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-        <ThemedText style={styles.title}>Expense</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          Track shopping purchases and manual expenses together in one clean view.
-        </ThemedText>
-
-        <ThemedView style={styles.summaryGrid}>
-          <ThemedView style={styles.summaryCard}>
-            <ThemedText style={styles.summaryLabel}>Today</ThemedText>
-            <ThemedText style={styles.amount}>₹{summary.dailyTotal.toFixed(1)}</ThemedText>
-          </ThemedView>
-          <ThemedView style={styles.summaryCard}>
-            <ThemedText style={styles.summaryLabel}>This month</ThemedText>
-            <ThemedText style={styles.amount}>₹{summary.monthlyTotal.toFixed(1)}</ThemedText>
-          </ThemedView>
-          <ThemedView style={styles.summaryCard}>
-            <ThemedText style={styles.summaryLabel}>All time</ThemedText>
-            <ThemedText style={styles.amount}>₹{summary.allTimeTotal.toFixed(1)}</ThemedText>
-          </ThemedView>
-        </ThemedView>
-
-        <ThemedView style={styles.heroCard}>
-          <ThemedText style={styles.heroTitle}>Quick, clean expense tracking</ThemedText>
-          <ThemedText style={styles.heroSubtitle}>Tap to add your expense</ThemedText>
-
-          <Pressable style={styles.heroAction} onPress={handleToggleForm}>
-            <Ionicons name={isFormOpen ? "close-circle" : "add-circle"} size={22} color="white" />
-            <ThemedText style={styles.heroActionText}>
-              {isFormOpen ? "Hide categories" : "Add new item"}
-            </ThemedText>
-          </Pressable>
-        </ThemedView>
-
-        {isFormOpen ? (
-          <ThemedView style={styles.formCard}>
-            <ThemedText style={styles.sectionTitle}>Pick a category</ThemedText>
-            <View style={styles.categoryGrid}>
-              {expenseCategories.map((category) => (
-                <Pressable
-                  key={category.label}
-                  style={styles.categoryButton}
-                  onPress={() => handleOpenCategory(category)}
-                >
-                  <View style={[styles.categoryIconWrapper, { backgroundColor: category.color }]}>
-                    <Ionicons name={category.icon} size={20} color="white" />
-                  </View>
-                  <ThemedText style={styles.categoryLabel}>{category.label}</ThemedText>
-                </Pressable>
-              ))}
-            </View>
-          </ThemedView>
-        ) : null}
-
-        <ThemedView style={styles.listSection}>
-          <ThemedText style={styles.sectionTitle}>All expenses</ThemedText>
-          {expenseEntries.length > 0 ? (
-            <>
-              <ListSearchBar
-                filters={filters}
-                onFiltersChange={setFilters}
-                categories={categoryOptions}
-                showSourceFilter
-                placeholder="Search expenses, categories, dates..."
-              />
-              <ListSortBar
-                fields={[
-                  { key: "date", label: "Date" },
-                  { key: "name", label: "Name" },
-                  { key: "amount", label: "Amount" },
-                  { key: "category", label: "Category" },
-                  { key: "source", label: "Source" },
-                ]}
-                sortField={sortField}
-                sortDirection={sortDirection}
-                onSortChange={(field, direction) => {
-                  setSortField(field);
-                  setSortDirection(direction);
-                }}
-              />
-              {selectedCategoryMonthlyTotal !== null ? (
-                <ThemedView style={styles.categoryTotalCard}>
-                  <ThemedText style={styles.categoryTotalLabel}>
-                    {filters.category} spent this month
-                  </ThemedText>
-                  <ThemedText style={styles.categoryTotalAmount}>
-                    ₹{selectedCategoryMonthlyTotal.toFixed(2)}
-                  </ThemedText>
-                </ThemedView>
-              ) : null}
-              <SelectionTotalBar
-                active={isSelectingItems}
-                count={selectedEntries.length}
-                total={selectedItemsTotal}
-                onToggle={toggleSelectionMode}
-                onClear={() => setSelectedItemIds(new Set())}
-              />
-            </>
-          ) : null}
-          {expenseEntries.length === 0 ? (
-            <ThemedView style={styles.emptyCard}>
-              <ThemedText style={styles.emptyText}>No expenses yet. Tap a category to add one.</ThemedText>
-            </ThemedView>
-          ) : allExpenses.length === 0 ? (
-            <ThemedView style={styles.emptyCard}>
-              <ThemedText style={styles.emptyText}>
-                {isFilterActive(filters) ? "No expenses match your search or filters." : "No expenses to show."}
-              </ThemedText>
-            </ThemedView>
-          ) : (
-            <>
-              {(allExpenses.slice(0, visibleCount)).map((entry) => (
-                <Pressable
-                  key={entry.id}
-                  style={[styles.expenseCard, isSelectingItems && selectedItemIds.has(entry.id) && styles.expenseCardSelected]}
-                  onPress={isSelectingItems ? () => toggleItemSelection(entry.id) : undefined}
-                  onLongPress={isSelectingItems ? undefined : () => handleOpenActions(entry.id)}
-                >
-                  <View style={styles.expenseRow}>
-                    {isSelectingItems ? (
-                      <View style={[styles.selectionIndicator, selectedItemIds.has(entry.id) && styles.selectionIndicatorActive]}>
-                        {selectedItemIds.has(entry.id) ? <Ionicons name="checkmark" size={15} color="white" /> : null}
-                      </View>
-                    ) : null}
-                    <View>
-                      <ThemedText style={styles.expenseLabel}>{entry.label}</ThemedText>
-                      <ThemedText style={styles.expenseMeta}>{entry.category}</ThemedText>
-                    </View>
-                    <ThemedText style={styles.expenseAmount}>₹{entry.amount.toFixed(2)}</ThemedText>
-                  </View>
-                  <View style={styles.expenseFooter}>
-                    <ThemedText style={styles.expenseDate}>{entry.date}</ThemedText>
-                    <ThemedText style={styles.expenseSource}>{entry.source}</ThemedText>
-                  </View>
-                </Pressable>
-              ))}
-              {allExpenses.length > 6 ? (
-                <Pressable
-                  style={styles.showMoreButton}
-                  onPress={() => {
-                    if (visibleCount >= allExpenses.length) {
-                      setVisibleCount(6);
-                    } else {
-                      const remaining = allExpenses.length - visibleCount;
-                      setVisibleCount((c) => c + Math.min(5, remaining));
-                    }
-                  }}
-                >
-                  <ThemedText style={styles.showMoreText}>
-                    {visibleCount >= allExpenses.length ? "Show less" : `Show ${Math.min(5, allExpenses.length - visibleCount)} more`}
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </>
-          )}
-        </ThemedView>
-
-        <Pressable style={styles.button} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={18} color="white" style={styles.buttonIcon} />
-          <ThemedText style={styles.buttonText}>Back to Shopping</ThemedText>
-        </Pressable>
-      </ScrollView>
-
-      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Add {selectedCategory.label}</ThemedText>
-              <Pressable onPress={() => setModalVisible(false)} style={styles.modalCloseButton}>
-                <Ionicons name="close" size={20} color="#94a3b8" />
-              </Pressable>
-            </View>
-
-            <View style={styles.selectedCategoryRow}>
-              <View style={[styles.categoryIconWrapperLarge, { backgroundColor: selectedCategory.color }]}>
-                <Ionicons name={selectedCategory.icon} size={22} color="white" />
-              </View>
-              <ThemedText style={styles.selectedCategoryText}>{selectedCategory.label}</ThemedText>
-            </View>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Amount"
-              placeholderTextColor="#94a3b8"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-            />
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Description (optional)"
-              placeholderTextColor="#94a3b8"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={3}
-            />
-
-            <Pressable style={styles.submitButton} onPress={handleAddExpense}>
-              <ThemedText style={styles.submitButtonText}>Save expense</ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-      <ItemActions
-        visible={actionsVisible}
-        onClose={handleCloseActions}
-        onEdit={handleActionsEdit}
-        onDelete={handleActionsDelete}
-      />
-    </ThemedView>
-  );
+  return <ThemedView style={styles.container}><ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false}>
+    <ThemedText style={styles.title}>Expense</ThemedText><ThemedText style={styles.subtitle}>All confirmed purchases and monthly costs live in one place.</ThemedText>
+    <View style={styles.summaryGrid}>{[["Today", summary.dailyTotal], ["This month", summary.monthlyTotal], ["All time", summary.allTimeTotal]].map(([label, value]) => <ThemedView key={label as string} style={styles.summaryCard}><ThemedText style={styles.muted}>{label as string}</ThemedText><ThemedText style={styles.total}>₹{(value as number).toFixed(2)}</ThemedText></ThemedView>)}</View>
+    <View style={styles.switcher}><Pressable onPress={() => setMode("monthly")} style={[styles.switchOption, mode === "monthly" && styles.switchActive]}><Ionicons name="calendar-outline" size={18} color="white" /><ThemedText style={styles.switchText}>Monthly expenses</ThemedText></Pressable><Pressable onPress={() => setMode("buy")} style={[styles.switchOption, mode === "buy" && styles.switchActive]}><Ionicons name="cart-outline" size={18} color="white" /><ThemedText style={styles.switchText}>Buy items</ThemedText></Pressable></View>
+    <ThemedText style={styles.sectionTitle}>{mode === "monthly" ? "Monthly expense categories" : "Buy items by category"}</ThemedText>
+    <View style={styles.categoryGrid}>{categories.map((category) => <Pressable key={category.label} onPress={() => openAdd(category)} style={styles.category}><View style={[styles.categoryIcon, { backgroundColor: category.color }]}><Ionicons name={category.icon as any} size={20} color="white" /></View><ThemedText style={styles.categoryLabel}>{category.label}</ThemedText></Pressable>)}</View>
+    <ThemedText style={styles.sectionTitle}>This month ({monthExpenses.length})</ThemedText>
+    {monthExpenses.length === 0 ? <ThemedView style={styles.empty}><ThemedText style={styles.muted}>No expenses recorded this month.</ThemedText></ThemedView> : monthExpenses.map((expense) => <Pressable key={expense.id} style={styles.expenseCard} onLongPress={() => { setSelectedActionId(expense.id); setActionsVisible(true); }}><View style={styles.expenseHeader}><View style={styles.grow}><ThemedText style={styles.expenseName}>{expense.description}</ThemedText><ThemedText style={styles.muted}>{expense.category} - {expense.source || "Monthly expense"}</ThemedText></View><ThemedText style={styles.amount}>₹{expense.amount.toFixed(2)}</ThemedText></View><View style={styles.expenseFooter}><ThemedText style={styles.muted}>{expense.quantity ? `${expense.quantity} x ₹${expense.unitPrice?.toFixed(2)}` : expense.purchasedDate}</ThemedText></View></Pressable>)}
+  </ScrollView>
+    <Modal transparent animationType="slide" visible={modalOpen} onRequestClose={() => { setModalOpen(false); setEditId(null); }}><View style={styles.backdrop}><View style={styles.modal}><View style={styles.modalHeader}><ThemedText style={styles.modalTitle}>{editId ? "Edit expense" : `Add ${selected.label}`}</ThemedText><Pressable onPress={() => { setModalOpen(false); setEditId(null); }}><Ionicons name="close" size={24} color="#94a3b8" /></Pressable></View><TextInput style={styles.input} placeholder={mode === "buy" ? "Item name" : "Description (optional)"} placeholderTextColor="#94a3b8" value={name} onChangeText={setName} />{mode === "buy" ? <TextInput style={styles.input} placeholder="Count" placeholderTextColor="#94a3b8" keyboardType="number-pad" value={count} onChangeText={setCount} /> : null}<TextInput style={styles.input} placeholder={mode === "buy" ? "Cost per item (₹)" : "Amount (₹)"} placeholderTextColor="#94a3b8" keyboardType="decimal-pad" value={amount} onChangeText={setAmount} /><Pressable style={styles.saveButton} onPress={save}><ThemedText style={styles.saveText}>{editId ? "Save changes" : "Save expense"}</ThemedText></Pressable></View></View></Modal>
+    <ItemActions visible={actionsVisible} onClose={closeActions} onEdit={editSelectedExpense} onDelete={deleteSelectedExpense} title={expenses.find((item) => item.id === selectedActionId)?.description} />
+  </ThemedView>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 18,
-  },
-  screenContent: {
-    marginTop: 12,
-    paddingBottom: 32,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    marginBottom: 6,
-    marginTop: 15,
-    height: 40,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#94a3b8",
-    marginTop: 10,
-    marginBottom: 20,
-    lineHeight: 22,
-  },
-  summaryGrid: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 22,
-  },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 24,
-    padding: 20,
-    backgroundColor: "#111827",
-  },
-  categoryTotalCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginTop: 12,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: "#102a43",
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-  },
-  categoryTotalLabel: {
-    flex: 1,
-    color: "#dbeafe",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  categoryTotalAmount: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: "#cbd5e1",
-    marginBottom: 6,
-  },
-  amount: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "white",
-  },
-  heroCard: {
-    borderRadius: 24,
-    padding: 20,
-    backgroundColor: "#154cc2",
-    marginBottom: 18,
-  },
-  heroTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 8,
-    color: "white",
-  },
-  heroSubtitle: {
-    color: "#cbd5e1",
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  heroAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#000000",
-    paddingVertical: 12,
-    borderRadius: 16,
-  },
-  heroActionText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  formCard: {
-    marginBottom: 18,
-    padding: 18,
-    borderRadius: 24,
-    backgroundColor: "#171717",
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 14,
-  },
-  categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-  categoryButton: {
-    flexBasis: "48%",
-    backgroundColor: "#0f172a",
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#1f2937",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  categoryIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: "#2563eb",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  categoryLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "white",
-  },
-  listSection: {
-    marginBottom: 24,
-  },
-  emptyCard: {
-    borderRadius: 22,
-    padding: 18,
-    backgroundColor: "#111827",
-  },
-  emptyText: {
-    color: "#94a3b8",
-  },
-  expenseCard: {
-    borderRadius: 22,
-    padding: 18,
-    backgroundColor: "#111827",
-    marginBottom: 12,
-  },
-  expenseCardSelected: {
-    borderColor: "#3b82f6",
-    backgroundColor: "#102a43",
-  },
-  selectionIndicator: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#64748b",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  selectionIndicatorActive: {
-    backgroundColor: "#2563eb",
-    borderColor: "#2563eb",
-  },
-  expenseRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-    alignItems: "center",
-  },
-  expenseLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "white",
-  },
-  expenseMeta: {
-    color: "#94a3b8",
-    marginTop: 4,
-    fontSize: 13,
-  },
-  expenseAmount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#38bdf8",
-  },
-  expenseFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 14,
-  },
-  expenseDate: {
-    color: "#94a3b8",
-    fontSize: 13,
-  },
-  expenseSource: {
-    color: "#cbd5e1",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 18,
-    backgroundColor: "#2563eb",
-  },
-  buttonIcon: {
-    marginRight: 4,
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "700",
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: "#0f172a",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 22,
-    borderColor: "#1f2937",
-    borderWidth: 1,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 18,
-  },
-  modalTitle: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  modalCloseButton: {
-    padding: 8,
-  },
-  selectedCategoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
-  },
-  categoryIconWrapperLarge: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: "#2563eb",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  selectedCategoryText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  input: {
-    backgroundColor: "#111827",
-    borderRadius: 18,
-    color: "white",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "#334155",
-    marginBottom: 14,
-  },
-  textArea: {
-    minHeight: 90,
-    textAlignVertical: "top",
-  },
-  submitButton: {
-    marginTop: 4,
-    backgroundColor: "#2563eb",
-    paddingVertical: 14,
-    borderRadius: 18,
-    alignItems: "center",
-  },
-  submitButtonText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  entryActions: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-  },
-  iconButton: {
-    padding: 6,
-    borderRadius: 8,
-  },
-  showMoreButton: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  showMoreText: {
-    color: "#2563eb",
-    fontWeight: "700",
-  },
-});
+const styles = StyleSheet.create({ container: { flex: 1, padding: 18 }, content: { paddingTop: 32, paddingBottom: 88, gap: 14 }, title: { fontSize: 30, fontWeight: "800", height: 40 }, subtitle: { color: "#94a3b8", lineHeight: 21 }, summaryGrid: { flexDirection: "row", gap: 8 }, summaryCard: { flex: 1, backgroundColor: "#111827", borderRadius: 16, padding: 13, gap: 5 }, muted: { color: "#94a3b8", fontSize: 13 }, total: { color: "white", fontWeight: "800", fontSize: 16 }, switcher: { flexDirection: "row", backgroundColor: "#111827", padding: 5, gap: 5, borderRadius: 16 }, switchOption: { flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 7, paddingVertical: 12, borderRadius: 12 }, switchActive: { backgroundColor: "#2563eb" }, switchText: { color: "white", fontWeight: "800", fontSize: 13 }, sectionTitle: { fontSize: 18, fontWeight: "800", marginTop: 3 }, categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 }, category: { width: "31%", minHeight: 82, backgroundColor: "#111827", borderRadius: 16, alignItems: "center", justifyContent: "center", padding: 8, gap: 8 }, categoryIcon: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" }, categoryLabel: { color: "white", textAlign: "center", fontSize: 12, fontWeight: "700" }, empty: { backgroundColor: "#111827", padding: 18, borderRadius: 16 }, expenseCard: { backgroundColor: "#111827", borderRadius: 16, padding: 15, gap: 12 }, expenseHeader: { flexDirection: "row", gap: 12 }, grow: { flex: 1, gap: 4 }, expenseName: { color: "white", fontSize: 16, fontWeight: "800" }, amount: { color: "#38bdf8", fontSize: 16, fontWeight: "800" }, expenseFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.6)" }, modal: { backgroundColor: "#171717", padding: 22, gap: 13, borderTopLeftRadius: 28, borderTopRightRadius: 28 }, modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, modalTitle: { color: "white", fontSize: 21, fontWeight: "800" }, input: { color: "white", backgroundColor: "#111827", borderColor: "#334155", borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }, saveButton: { backgroundColor: "#2563eb", paddingVertical: 14, borderRadius: 14, alignItems: "center" }, saveText: { color: "white", fontWeight: "800" } });
