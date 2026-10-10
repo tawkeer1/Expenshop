@@ -7,10 +7,11 @@ type Props = {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onCopy?: () => void;
   title?: string;
 };
 
-export default function ItemActions({ visible, onClose, onEdit, onDelete, title }: Props) {
+export default function ItemActions({ visible, onClose, onEdit, onDelete, onCopy, title }: Props) {
   const translate = useRef(new Animated.Value(30)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [confirming, setConfirming] = useState(false);
@@ -55,6 +56,12 @@ export default function ItemActions({ visible, onClose, onEdit, onDelete, title 
             <Pressable style={styles.option} onPress={handleEditPress}>
               <ThemedText style={styles.optionText}>Edit</ThemedText>
             </Pressable>
+
+            {onCopy ? (
+              <Pressable style={styles.option} onPress={() => { onCopy(); onClose(); }}>
+                <ThemedText style={styles.optionText}>Copy</ThemedText>
+              </Pressable>
+            ) : null}
 
             <Pressable style={[styles.option, styles.destructive]} onPress={handleDeletePress}>
               <ThemedText style={[styles.optionText, styles.destructiveText]}>Delete</ThemedText>

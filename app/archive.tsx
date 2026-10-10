@@ -1,4 +1,4 @@
-import { getArchivedExpenseItems, getArchivedExpenseMonths, getArchivedShoppingItems, getArchivedShoppingMonths } from "@/app/models/shoppinglist";
+import { getArchivedExpenseItems, getArchivedExpenseMonths, getArchivedShoppingItems, getArchivedShoppingMonths, subscribeShoppingList, type ExpenseItem, type ShoppingListItem } from "@/app/models/shoppinglist";
 import ListSearchBar from "@/components/list-search-bar";
 import ListSortBar from "@/components/list-sort-bar";
 import SelectionTotalBar from "@/components/selection-total-bar";
@@ -56,6 +56,8 @@ export default function ArchiveScreen() {
   const [expenseFilters, setExpenseFilters] = useState<ListFilterState>(emptyListFilters);
   const [isSelectingItems, setIsSelectingItems] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
+  const [rawShoppingItems, setRawShoppingItems] = useState<ShoppingListItem[]>([]);
+  const [rawExpenseItems, setRawExpenseItems] = useState<ExpenseItem[]>([]);
 
   useEffect(() => {
     setShoppingFilters(emptyListFilters);
@@ -65,22 +67,19 @@ export default function ArchiveScreen() {
   }, [selectedMonth, viewTab]);
 
   useEffect(() => {
-    const s = getArchivedShoppingMonths();
-    const e = getArchivedExpenseMonths();
-    const setUnion = Array.from(new Set([...s, ...e])).sort().reverse();
-    setMonths(setUnion);
-    if (setUnion.length > 0) setSelectedMonth(setUnion[0]);
-  }, []);
-
-  const rawShoppingItems = useMemo(
-    () => (selectedMonth ? getArchivedShoppingItems(selectedMonth) : []),
-    [selectedMonth],
-  );
-
-  const rawExpenseItems = useMemo(
-    () => (selectedMonth ? getArchivedExpenseItems(selectedMonth) : []),
-    [selectedMonth],
-  );
+    const refreshArchive = () => {
+      const shoppingMonths = getArchivedShoppingMonths();
+      const expenseMonths = getArchivedExpenseMonths();
+      const availableMonths = Array.from(new Set([...shoppingMonths, ...expenseMonths])).sort().reverse();
+      const nextSelectedMonth = selectedMonth && availableMonths.includes(selectedMonth) ? selectedMonth : availableMonths[0] ?? null;
+      setMonths(availableMonths);
+      setSelectedMonth(nextSelectedMonth);
+      setRawShoppingItems(nextSelectedMonth ? getArchivedShoppingItems(nextSelectedMonth) : []);
+      setRawExpenseItems(nextSelectedMonth ? getArchivedExpenseItems(nextSelectedMonth) : []);
+    };
+    refreshArchive();
+    return subscribeShoppingList(refreshArchive);
+  }, [selectedMonth]);
 
   const monthlyTotal = useMemo(() => {
     const shoppingTotal = rawShoppingItems.reduce(

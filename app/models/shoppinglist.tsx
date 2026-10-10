@@ -33,6 +33,7 @@ let expenseItems: ExpenseItem[] = [];
 let archivedShopping: Record<string, ShoppingListItem[]> = {};
 let archivedExpenses: Record<string, ExpenseItem[]> = {};
 let listeners: ((items: ShoppingListItem[]) => void)[] = [];
+let storageLoaded = false;
 
 const KEYS = {
   shopping: "expenshop:shoppingList",
@@ -51,6 +52,20 @@ const persist = async () => {
       [KEYS.archiveExpenses, JSON.stringify(archivedExpenses)],
     ]);
   } catch {}
+};
+
+const moveExpiredItemsToArchive = (referenceDate: Date) => {
+  const currentMonth = getDateKey(referenceDate).slice(0, 7);
+  const move = <T extends { purchasedDate: string }>(items: T[], archive: Record<string, T[]>) => {
+    const kept: T[] = [];
+    items.forEach((item) => {
+      const month = item.purchasedDate.slice(0, 7);
+      if (month === currentMonth) kept.push(item); else archive[month] = [item, ...(archive[month] || [])];
+    });
+    return kept;
+  };
+  shoppingList = move(shoppingList, archivedShopping);
+  expenseItems = move(expenseItems, archivedExpenses);
 };
 
 const load = async () => {
@@ -77,9 +92,13 @@ const load = async () => {
     }
     archivedShopping = values[KEYS.archiveShopping] ? JSON.parse(values[KEYS.archiveShopping]!) : {};
     archivedExpenses = values[KEYS.archiveExpenses] ? JSON.parse(values[KEYS.archiveExpenses]!) : {};
+    storageLoaded = true;
+    moveExpiredItemsToArchive(new Date());
     void persist();
     notify();
-  } catch {}
+  } catch {
+    storageLoaded = true;
+  }
 };
 void load();
 
@@ -124,17 +143,10 @@ export const getArchivedExpenseMonths = () => Object.keys(archivedExpenses).sort
 export const getArchivedExpenseItems = (monthKey: string) => [...(archivedExpenses[monthKey] || [])];
 
 export const archiveOldItems = (referenceDate: Date = new Date()) => {
-  const currentMonth = getDateKey(referenceDate).slice(0, 7);
-  const move = <T extends { purchasedDate: string }>(items: T[], archive: Record<string, T[]>) => {
-    const kept: T[] = [];
-    items.forEach((item) => {
-      const month = item.purchasedDate.slice(0, 7);
-      if (month === currentMonth) kept.push(item); else archive[month] = [item, ...(archive[month] || [])];
-    });
-    return kept;
-  };
-  shoppingList = move(shoppingList, archivedShopping);
-  expenseItems = move(expenseItems, archivedExpenses);
+  if (!storageLoaded) {
+    return;
+  }
+  moveExpiredItemsToArchive(referenceDate);
   notify(); void persist();
 };
 
