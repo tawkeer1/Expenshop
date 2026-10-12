@@ -19,6 +19,19 @@ const compareStrings = (a: string, b: string) => a.localeCompare(b, undefined, {
 const applyDirection = (result: number, direction: SortDirection) =>
   direction === "asc" ? result : -result;
 
+// Item IDs are generated with a timestamp. Copies include a "copy-" prefix, so
+// comparing IDs as plain strings incorrectly places every copied item before
+// newly added timestamp-only items on the same day.
+const getCreatedAtFromId = (id: string) => {
+  const timestamp = id.match(/(\d+)(?!.*\d)/)?.[1];
+  return timestamp ? Number(timestamp) : 0;
+};
+
+const compareByCreatedAt = (a: { id: string }, b: { id: string }) => {
+  const result = getCreatedAtFromId(a.id) - getCreatedAtFromId(b.id);
+  return result || compareStrings(a.id, b.id);
+};
+
 export const defaultSortDirection = (field: string): SortDirection => {
   if (field === "name" || field === "category" || field === "source") {
     return "asc";
@@ -56,7 +69,7 @@ export const sortShoppingItems = (
     }
 
     if (result === 0) {
-      result = compareStrings(a.id, b.id);
+      result = field === "date" ? compareByCreatedAt(a, b) : compareStrings(a.id, b.id);
     }
 
     return applyDirection(result, direction);
@@ -95,7 +108,7 @@ export const sortExpenseEntries = (
     }
 
     if (result === 0) {
-      result = compareStrings(a.id, b.id);
+      result = field === "date" ? compareByCreatedAt(a, b) : compareStrings(a.id, b.id);
     }
 
     return applyDirection(result, direction);
@@ -131,7 +144,7 @@ export const sortExpenseItems = (
     }
 
     if (result === 0) {
-      result = compareStrings(a.id, b.id);
+      result = field === "date" ? compareByCreatedAt(a, b) : compareStrings(a.id, b.id);
     }
 
     return applyDirection(result, direction);

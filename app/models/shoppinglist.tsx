@@ -153,12 +153,14 @@ export const archiveOldItems = (referenceDate: Date = new Date()) => {
 export const getExpenseSummary = (date = new Date()) => {
   const dayKey = getDateKey(date);
   const monthKey = dayKey.slice(0, 7);
+  const yearKey = dayKey.slice(0, 4);
   const allExpenses = [...expenseItems, ...Object.values(archivedExpenses).flat()];
   return allExpenses.reduce((summary, item) => {
     const amount = Number(item.amount) || 0;
     summary.allTimeTotal += amount;
     if (item.purchasedDate === dayKey) summary.dailyTotal += amount;
     if (item.purchasedDate.startsWith(monthKey)) summary.monthlyTotal += amount;
+    if (item.purchasedDate.startsWith(yearKey)) summary.yearlyTotal += amount;
     return summary;
-  }, { dayKey, monthKey, dailyTotal: 0, monthlyTotal: 0, allTimeTotal: 0 });
+  }, { dayKey, monthKey, yearKey, dailyTotal: 0, monthlyTotal: 0, yearlyTotal: 0, allTimeTotal: 0 });
 };

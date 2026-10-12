@@ -10,6 +10,8 @@ type SelectionTotalBarProps = {
   total: number;
   onToggle: () => void;
   onClear: () => void;
+  onSelectAll?: () => void;
+  allSelected?: boolean;
 };
 
 export default function SelectionTotalBar({
@@ -18,6 +20,8 @@ export default function SelectionTotalBar({
   total,
   onToggle,
   onClear,
+  onSelectAll,
+  allSelected = false,
 }: SelectionTotalBarProps) {
   if (!active) {
     return (
@@ -37,6 +41,11 @@ export default function SelectionTotalBar({
         <ThemedText style={styles.total}>₹{total.toFixed(2)}</ThemedText>
       </View>
       <View style={styles.actions}>
+        {onSelectAll ? (
+          <Pressable style={styles.selectAllButton} onPress={onSelectAll} accessibilityLabel={allSelected ? "Deselect all items" : "Select all items"}>
+            <ThemedText style={styles.selectAllButtonText}>{allSelected ? "Deselect all" : "Select all"}</ThemedText>
+          </Pressable>
+        ) : null}
         {count > 0 ? (
           <Pressable style={styles.clearButton} onPress={onClear} accessibilityLabel="Clear selected items">
             <ThemedText style={styles.clearButtonText}>Clear</ThemedText>
@@ -58,6 +67,8 @@ const styles = StyleSheet.create({
   label: { color: "#bfdbfe", fontSize: 13, fontWeight: "700" },
   total: { color: "white", fontSize: 20, fontWeight: "800", marginTop: 3, fontVariant: ["tabular-nums"] },
   actions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  selectAllButton: { paddingVertical: 8, paddingHorizontal: 10 },
+  selectAllButtonText: { color: "#bfdbfe", fontWeight: "700" },
   clearButton: { paddingVertical: 8, paddingHorizontal: 10 },
   clearButtonText: { color: "#bfdbfe", fontWeight: "700" },
   doneButton: { paddingVertical: 8, paddingHorizontal: 11, borderRadius: 10, backgroundColor: "#2563eb" },

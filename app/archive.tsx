@@ -56,6 +56,7 @@ export default function ArchiveScreen() {
   const [expenseFilters, setExpenseFilters] = useState<ListFilterState>(emptyListFilters);
   const [isSelectingItems, setIsSelectingItems] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
+  const [showCategoryTotals, setShowCategoryTotals] = useState(false);
   const [rawShoppingItems, setRawShoppingItems] = useState<ShoppingListItem[]>([]);
   const [rawExpenseItems, setRawExpenseItems] = useState<ExpenseItem[]>([]);
 
@@ -64,6 +65,7 @@ export default function ArchiveScreen() {
     setExpenseFilters(emptyListFilters);
     setIsSelectingItems(false);
     setSelectedItemIds(new Set());
+    setShowCategoryTotals(false);
   }, [selectedMonth, viewTab]);
 
   useEffect(() => {
@@ -133,6 +135,24 @@ export default function ArchiveScreen() {
       .filter((item) => item.category === expenseFilters.category)
       .reduce((total, item) => total + Number(item.amount || 0), 0);
   }, [expenseFilters.category, rawExpenseItems]);
+
+  const shoppingCategoryTotals = useMemo(() => {
+    return shoppingCategoryOptions.map((category) => ({
+      category,
+      total: rawShoppingItems
+        .filter((item) => item.category === category)
+        .reduce((total, item) => total + Number(item.price || 0) * Number(item.quantity || 0), 0),
+    }));
+  }, [rawShoppingItems, shoppingCategoryOptions]);
+
+  const expenseCategoryTotals = useMemo(() => {
+    return expenseCategoryOptions.map((category) => ({
+      category,
+      total: rawExpenseItems
+        .filter((item) => item.category === category)
+        .reduce((total, item) => total + Number(item.amount || 0), 0),
+    }));
+  }, [expenseCategoryOptions, rawExpenseItems]);
 
   const selectedShoppingItems = useMemo(
     () => rawShoppingItems.filter((item) => selectedItemIds.has(item.id)),
@@ -243,6 +263,25 @@ export default function ArchiveScreen() {
                         </ThemedText>
                       </ThemedView>
                     ) : null}
+                    <Pressable
+                      style={styles.categoryTotalsButton}
+                      onPress={() => setShowCategoryTotals((visible) => !visible)}
+                      accessibilityLabel="Show total spent for each shopping category"
+                    >
+                      <ThemedText style={styles.categoryTotalsButtonText}>
+                        {showCategoryTotals ? "Hide category totals" : "Show category totals"}
+                      </ThemedText>
+                    </Pressable>
+                    {showCategoryTotals ? (
+                      <ThemedView style={styles.categoryTotalsCard}>
+                        {shoppingCategoryTotals.map(({ category, total }) => (
+                          <View key={category} style={styles.categoryTotalRow}>
+                            <ThemedText style={styles.categoryTotalRowLabel}>{category}</ThemedText>
+                            <ThemedText style={styles.categoryTotalRowAmount}>₹{total.toFixed(2)}</ThemedText>
+                          </View>
+                        ))}
+                      </ThemedView>
+                    ) : null}
                     <SelectionTotalBar
                       active={isSelectingItems}
                       count={selectedShoppingItems.length}
@@ -324,6 +363,25 @@ export default function ArchiveScreen() {
                         </ThemedText>
                       </ThemedView>
                     ) : null}
+                    <Pressable
+                      style={styles.categoryTotalsButton}
+                      onPress={() => setShowCategoryTotals((visible) => !visible)}
+                      accessibilityLabel="Show total spent for each expense category"
+                    >
+                      <ThemedText style={styles.categoryTotalsButtonText}>
+                        {showCategoryTotals ? "Hide category totals" : "Show category totals"}
+                      </ThemedText>
+                    </Pressable>
+                    {showCategoryTotals ? (
+                      <ThemedView style={styles.categoryTotalsCard}>
+                        {expenseCategoryTotals.map(({ category, total }) => (
+                          <View key={category} style={styles.categoryTotalRow}>
+                            <ThemedText style={styles.categoryTotalRowLabel}>{category}</ThemedText>
+                            <ThemedText style={styles.categoryTotalRowAmount}>₹{total.toFixed(2)}</ThemedText>
+                          </View>
+                        ))}
+                      </ThemedView>
+                    ) : null}
                     <SelectionTotalBar
                       active={isSelectingItems}
                       count={selectedExpenseItems.length}
@@ -400,6 +458,12 @@ const styles = StyleSheet.create({
   categoryTotalCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12, padding: 14, borderRadius: 16, backgroundColor: "#102a43", borderWidth: 1, borderColor: "#1d4ed8" },
   categoryTotalLabel: { flex: 1, color: "#dbeafe", fontSize: 14, fontWeight: "700" },
   categoryTotalAmount: { color: "white", fontSize: 18, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  categoryTotalsButton: { alignSelf: "flex-start", marginTop: 12, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: "#1e3a5f" },
+  categoryTotalsButtonText: { color: "#dbeafe", fontWeight: "700" },
+  categoryTotalsCard: { marginTop: 8, padding: 12, gap: 10, borderRadius: 14, backgroundColor: "#111827", borderWidth: 1, borderColor: "#1f2937" },
+  categoryTotalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  categoryTotalRowLabel: { flex: 1, color: "#cbd5e1" },
+  categoryTotalRowAmount: { color: "white", fontWeight: "700", fontVariant: ["tabular-nums"] },
   section: { marginBottom: 18 },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
   itemCard: { padding: 10, borderRadius: 12, backgroundColor: "#0b1220", marginBottom: 10, borderWidth: 1, borderColor: "#0f172a" },
